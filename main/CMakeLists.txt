@@ -22,7 +22,7 @@ endif()
 #endif()
 
 idf_component_register(
-    SRCS "${APP_SRC}"
-    INCLUDE_DIRS "."
-    REQUIRES can_dispatch
+    SRCS ${APP_SRC} ${EXAMPLES_DIR}/init_hardware.c
+    INCLUDE_DIRS "." "${EXAMPLES_DIR}"
+    REQUIRES can_dispatch examples_utils
 )
