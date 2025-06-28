@@ -1,5 +1,5 @@
 idf_component_register(
-  SRCS "arduino.c"
+  SRCS "arduino_adapter.c"
   INCLUDE_DIRS "."
   PRIV_REQUIRES can_dispatch
 )

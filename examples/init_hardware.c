@@ -34,8 +34,41 @@ void init_hardware(can_config_t *hw_config_ptr)
         .bus_not_running_timeout = pdMS_TO_TICKS(100),    // in ms
     };
 
-#elif CONFIG_CAN_BACKEND_MCP2515
+#elif CONFIG_CAN_BACKEND_MCP2515_SINGLE
     // init MCP2515 controller
+    static const gpio_num_t MISO_GPIO = GPIO_NUM_37;  // SPI MISO
+    static const gpio_num_t MOSI_GPIO = GPIO_NUM_38;  // SPI MOSI
+    static const gpio_num_t SCLK_GPIO = GPIO_NUM_36;  // SPI SCLK
+    static const gpio_num_t CS_GPIO = GPIO_NUM_33;    // Chip Select
+    static const gpio_num_t INT_GPIO = GPIO_NUM_34;   // Interrupt
+    static const uint32_t CAN_BAUDRATE = 1000000;     // 1 Mbps
+    static const spi_host_device_t SPI_HOST = SPI2_HOST;  // Explicitly define SPI host
+
+    *hw_config_ptr = (can_config_t){
+        .spi_bus = {
+            .miso_io_num = MISO_GPIO,
+            .mosi_io_num = MOSI_GPIO,
+            .sclk_io_num = SCLK_GPIO,
+            .quadwp_io_num = -1,
+            .quadhd_io_num = -1,
+            .max_transfer_sz = 0,        // No limit on transfer size
+            .flags = SPICOMMON_BUSFLAG_MASTER // Enable DMA
+        },
+        .spi_dev = {
+            .mode = 0,                  // SPI mode 0 (CPOL=0, CPHA=0)
+            .clock_speed_hz = 40000000, // 40 MHz SPI clock speed
+            .spics_io_num = CS_GPIO,
+            .queue_size = 1024,         // Increased queue size
+            .flags = 0,
+            .command_bits = 0,
+            .address_bits = 0,
+            .dummy_bits = 0
+        },
+        .int_pin = INT_GPIO,
+        .baudrate = CAN_BAUDRATE,
+        .spi_host = SPI_HOST            // Add SPI host to config
+    };
+
 #elif CONFIG_CAN_BACKEND_MCP_MULTI
     // init multi-MCP controller
 #elif CONFIG_CAN_BACKEND_ARDUINO

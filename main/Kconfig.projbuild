@@ -7,7 +7,7 @@ menu "*** CAN bus examples  ***"
     config CAN_BACKEND_TWAI
         bool "Built-in TWAI (SN65HVD230)"
     
-    config CAN_BACKEND_MCP2515
+    config CAN_BACKEND_MCP2515_SINGLE
         bool "MCP2515 single controller"
     
     config CAN_BACKEND_MCP2515_MULTI

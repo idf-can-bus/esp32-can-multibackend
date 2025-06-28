@@ -15,8 +15,8 @@ from typing import List, Optional
 import threading
 
 from .commands import ShellCommand,ShellCommandRunner
-from .kconfig_option import ConfigOption, KconfigMenuItems
-from .sdkconfig import Sdkconfig
+from .kconfig_options import ConfigOption, KconfigMenuItems
+from .sdkconfig_options import Sdkconfig
 
 logger = logging.getLogger(__name__)
 

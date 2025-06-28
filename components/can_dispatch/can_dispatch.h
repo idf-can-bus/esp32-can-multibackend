@@ -5,11 +5,18 @@
 
 #include "sdkconfig.h"
 #if CONFIG_CAN_BACKEND_TWAI
-#include "can_backend_twai.h"
+#include "twai_adapter.h"
+#elif CONFIG_CAN_BACKEND_MCP2515_SINGLE
+#include "mcp2515_single_adapter.h"
+#elif CONFIG_CAN_BACKEND_MCP_MULTI
+#include "mcp2515_multi_adapter.h"
+#elif CONFIG_CAN_BACKEND_ARDUINO
+#include "can_backend_arduino.h"
 #endif
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
 
 
 #ifdef __cplusplus
@@ -20,8 +27,9 @@ extern "C" {
 #if CONFIG_CAN_BACKEND_TWAI
     /* call TWAI backend */
     typedef twai_config_t can_config_t;
-#elif CONFIG_CAN_BACKEND_MCP2515
+#elif CONFIG_CAN_BACKEND_MCP2515_SINGLE
     /* call MCP2515 backend */
+    typedef mcp2515_single_config_t can_config_t;
 #elif CONFIG_CAN_BACKEND_MCP_MULTI
     /* call multi-MCP backend */
 #elif CONFIG_CAN_BACKEND_ARDUINO

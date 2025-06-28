@@ -17,9 +17,9 @@ elseif(CONFIG_EXAMPLE_RECV_INT_MULTI)
 endif()
 
 # Stop build if no example is selected
-#if(APP_SRC STREQUAL "")
-#    message(FATAL_ERROR "No example selected in menuconfig!")
-#endif()
+if(APP_SRC STREQUAL "")
+   message(FATAL_ERROR "No example selected in menuconfig!")
+endif()
 
 idf_component_register(
     SRCS ${APP_SRC} ${EXAMPLES_DIR}/init_hardware.c

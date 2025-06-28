@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "can_backend_twai.c"
+    SRCS "twai_adapter.c"
     INCLUDE_DIRS "."
     REQUIRES can_iface driver
 )

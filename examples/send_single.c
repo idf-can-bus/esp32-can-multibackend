@@ -15,7 +15,7 @@ void app_main(void)
 
     // --- init hardware ----------------------------------------------------------------------------
     can_config_t hw_config;
-    init_hardware(&hw_config);
+    init_hardware(&hw_config);  // Refer to implementation for hardware initialization requirements
 
     // --- common sender example part ---------------------------------------------------------------
     canif_init(&hw_config);
