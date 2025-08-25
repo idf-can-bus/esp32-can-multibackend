@@ -99,103 +99,126 @@ void print_can_message(const can_message_t *message) {
     printf("\n");
 }
 
-// --- latency statistic --------------------------------------------------------------------------
-void reset_latency_statistic(latency_statistic_t *statistic_ptr)
+bool check_heartbeat(uint8_t received_heartbeat, uint8_t expected_heartbeat)
 {
-    statistic_ptr->time_shift_us = 0;
-    statistic_ptr->latency_us_sum = 0;
-    statistic_ptr->latency_us_count = 0;
-    statistic_ptr->latency_us_min = LONG_MAX;
-    statistic_ptr->latency_us_max = LONG_MIN;
-}
-
-void update_latency_statistic(latency_statistic_t *statistic_ptr, uint64_t sender_timestamp_us) 
-{
-    if (statistic_ptr->time_shift_us == 0) {
-        // count time shift between sender and receiver from first message
-        statistic_ptr->time_shift_us = esp_timer_get_time() - sender_timestamp_us;
-    }
-    // calculate latency from sender timestamp and time shift
-    uint64_t latency_us = esp_timer_get_time() - sender_timestamp_us + statistic_ptr->time_shift_us;
-    statistic_ptr->latency_us_sum += latency_us;
-    statistic_ptr->latency_us_count++;
-    if (latency_us < statistic_ptr->latency_us_min) {
-        statistic_ptr->latency_us_min = latency_us;
-    } else if (latency_us > statistic_ptr->latency_us_max) {
-        statistic_ptr->latency_us_max = latency_us;
-    }
-}
-
-void print_latency_statisti(latency_statistic_t *statistic_ptr)
-{
-    ESP_LOGI(TAG, "Latency statistic:");
-    ESP_LOGI(TAG, "Count of messages: %llu", statistic_ptr->latency_us_count);
-    ESP_LOGI(TAG, "Latency min: %ld [us]", statistic_ptr->latency_us_min);
-    ESP_LOGI(TAG, "Latency max: %ld [us]", statistic_ptr->latency_us_max);
-    if (statistic_ptr->latency_us_count > 0) {
-        ESP_LOGI(TAG, "Latency average: %ld [us]", statistic_ptr->latency_us_sum / (long int)statistic_ptr->latency_us_count);
-    } else {
-        ESP_LOGI(TAG, "Latency average: N/A");
-    }
-}
-
-bool check_heartbeat(uint8_t received_heartbeat, uint8_t *expected_heartbeat_ptr)
-{
-    bool success = received_heartbeat == *expected_heartbeat_ptr;
+    bool success = received_heartbeat == expected_heartbeat;
     if (!success) {
-        ESP_LOGE(TAG, "Heartbeat mismatch: expected %u, received %u", *expected_heartbeat_ptr, received_heartbeat);
+        ESP_LOGE(TAG, "Heartbeat mismatch: expected_heartbeat %u, payload->heartbeat %u", expected_heartbeat, received_heartbeat);
     } 
-    // add 1 to expected_heartbeat_ptr
-    *expected_heartbeat_ptr = (received_heartbeat + 1) % 255;
     
     return success;
 }
 
+// Here we assume that heartbeat is uint8_t in range 0-255
 uint8_t next_heartbeat(const uint8_t heartbeat) {
-    return (heartbeat + 1) % 255;
+    return heartbeat + 1;  // uint8_t automatically wraps 255->0
 }
 
-static uint32_t received_index = 0;
-static uint32_t send_index = 0;
-#define MAX_RS_INDEX 10000
-#define MAX_RS_INDEX_ON_ONE_LINE 80
+static uint64_t count_of_messages_for_log = 0;
+#define PRINT_DOT_EVERY_N_MESSAGES 10
+#define MAX_INDEX_ON_ONE_LINE 50
+#define PRINT_NL_EVERY_N_MESSAGES (PRINT_DOT_EVERY_N_MESSAGES*MAX_INDEX_ON_ONE_LINE)
 
-void process_received_message(can_message_t *message, latency_statistic_t *statistic_ptr, uint8_t *expected_heartbeat_ptr, const bool print_during_receive) {
+
+void log_message(const bool send, can_message_t *message, const bool print_details) {
+    if (print_details) {
+        print_can_message(message);
+    } else {
+        if (count_of_messages_for_log % PRINT_DOT_EVERY_N_MESSAGES == 0) {
+            printf(".");
+        }
+        if (count_of_messages_for_log % PRINT_NL_EVERY_N_MESSAGES == 0) {
+            if (send) {
+                printf("\n->");                
+            } else {
+                printf("\n<-");                                
+            }
+            printf(" (%lld) ", count_of_messages_for_log);
+        }        
+        fflush(stdout);
+        count_of_messages_for_log++;
+    }
+}
+
+// Sequence statistics 
+static uint64_t seq_rx_count = 0;                 // total payload->heartbeat TEST_MSG_ID frames
+static uint64_t seq_ok_in_order = 0;              // frames arriving exactly in expected_heartbeat order
+static uint64_t seq_lost = 0;                     // estimated number of lost frames (forward jump delta)
+static uint64_t seq_out_of_order_or_dup = 0;      // frames that appear behind expected_heartbeat (out-of-order or duplicate)
+static uint64_t seq_start_time_us = 0;            // Start time for sequence statistics
+static uint8_t expected_heartbeat = 0;            // expected_heartbeat heartbeat
+
+
+void process_received_message(can_message_t *message, const bool print_during_receive) {
     if (message == NULL) {
         ESP_LOGE(TAG, "Invalid message pointer");
-        return;
-    }
-    if (statistic_ptr == NULL) {
-        ESP_LOGE(TAG, "Invalid statistic pointer");
-        return;
-    }
-    if (expected_heartbeat_ptr == NULL) {
-        ESP_LOGE(TAG, "Invalid expected heartbeat pointer");
         return;
     }
     if (print_during_receive) {
         print_can_message(message);
     } else {
-        if (received_index % MAX_RS_INDEX_ON_ONE_LINE == 0) {
-            printf("\n<-\n");
-            fflush(stdout);
-        }
-        printf(".");
-        received_index++;
-        if (received_index >= MAX_RS_INDEX) {
-            received_index = 0;
-        }
+        log_message(false, message, print_during_receive);        
     }
     if (message->id == TEST_MSG_ID) {
         test_can_message_t *payload = (test_can_message_t *)message->data;
-        // if (!check_heartbeat(payload->heartbeat, expected_heartbeat_ptr)) {
-        //     return;
-        // }
-        update_latency_statistic(statistic_ptr, restore_timestamp48(& (payload->timestamp)));
 
+        // Sequence check 
+        // Calculate delta as signed difference with proper overflow handling
+        // Positive delta: payload->heartbeat > expected_heartbeat (lost frames)
+        // Negative delta: payload->heartbeat < expected_heartbeat (out-of-order/duplicate frames)
+        int16_t delta = (int16_t)payload->heartbeat - (int16_t)expected_heartbeat;
+        if (delta < -127) delta += 256;  // Handle uint8_t overflow
+        if (delta > 127) delta -= 256;   // Handle uint8_t overflow
+
+        // @TODO: remove this debug print
+        /*
+        if (! check_heartbeat(payload->heartbeat, expected_heartbeat)) {
+            ESP_LOGE(TAG, "%d != %d, delta: %d", payload->heartbeat, expected_heartbeat, delta);
+        }
+        */
+       
+        seq_rx_count++;
+        if (seq_start_time_us == 0) {
+            seq_start_time_us = esp_timer_get_time();  // Start timing on first message
+            seq_rx_count = 0;  // Reset counter to 1 for first message
+        }
+        
+        if (delta == 0) {
+            seq_ok_in_order++;
+        } else if (delta > 0) {
+            seq_lost += delta;  // Positive delta = lost frames
+        } else {
+            seq_out_of_order_or_dup++;  // Negative delta = out-of-order/duplicate
+        }
+
+        // Advance expected_heartbeat to next after the payload->heartbeat
+        expected_heartbeat = next_heartbeat(payload->heartbeat);
+
+        // Print and reset stats on END tag
         if (payload->sender_id == END_TAG_ID) {
-            print_latency_statisti(statistic_ptr);
-            reset_latency_statistic(statistic_ptr);
+            uint64_t current_time = esp_timer_get_time();
+            uint64_t elapsed_time_us = current_time - seq_start_time_us;
+            float elapsed_time_ms = (float)elapsed_time_us / 1000.0f;
+            float rx_rate_hz = 0.0f;
+            
+            if (elapsed_time_ms > 0) {
+                rx_rate_hz = (float)seq_rx_count / (elapsed_time_ms / 1000.0f);
+            }
+            printf("\n");
+            ESP_LOGI(TAG, "Sequence stats (since last END_TAG):");
+            ESP_LOGI(TAG, "  payload->heartbeat frames: %llu", seq_rx_count);
+            ESP_LOGI(TAG, "  in-order frames: %llu", seq_ok_in_order);
+            ESP_LOGI(TAG, "  estimated lost: %llu", seq_lost);
+            ESP_LOGI(TAG, "  out-of-order/dup: %llu", seq_out_of_order_or_dup);
+            ESP_LOGI(TAG, "  elapsed time: %.1f ms", elapsed_time_ms);
+            ESP_LOGI(TAG, "  rx rate: %.1f Hz", rx_rate_hz);
+            
+            // Reset sequence statistics window
+            seq_rx_count = 0;
+            seq_ok_in_order = 0;
+            seq_lost = 0;
+            seq_out_of_order_or_dup = 0;
+            seq_start_time_us = current_time;  // Start new measurement window
         }
     } 
 }
@@ -205,17 +228,5 @@ void debug_send_message(can_message_t *message, const bool print_during_send) {
         ESP_LOGE(TAG, "Invalid frame pointer");
         return;
     }
-    if (print_during_send) {
-        print_can_message(message);
-    } else {
-        if (send_index % MAX_RS_INDEX_ON_ONE_LINE == 0) {
-            printf("\n->\n");
-            fflush(stdout);
-        }
-        printf(".");
-        send_index++;
-        if (send_index >= MAX_RS_INDEX) {
-            send_index = 0;
-        }
-    }
+    log_message(true, message, print_during_send);
 }

@@ -66,32 +66,19 @@ void fullfill_test_messages(uint8_t sender_id, uint8_t heartbeat, can_message_t 
 // Print CAN message for debug purposes
 void print_can_message(const can_message_t *message);
 
-// --- latency statistic --------------------------------------------------------------------------
-typedef struct {
-    long int time_shift_us;
-    long int latency_us_sum;
-    uint64_t latency_us_count;
-    long int latency_us_min;
-    long int latency_us_max;
-} latency_statistic_t;
-
-// Reset latency statistic
-void reset_latency_statistic(latency_statistic_t *statistic_ptr);
-
-// Update latency statistic
-void update_latency_statistic(latency_statistic_t *statistic_ptr, uint64_t sender_timestamp_us);
-
-void print_latency_statisti(latency_statistic_t *statistic_ptr);
 
 // --- chack heartbeat ----------------------------------------------------------------------------
-bool check_heartbeat(uint8_t received_heartbeat, uint8_t *expected_heartbeat_ptr);
+bool check_heartbeat(uint8_t received_heartbeat, uint8_t expected_heartbeat);
 uint8_t next_heartbeat(const uint8_t heartbeat);
 
 // process received message in a example 
-void process_received_message(can_message_t *message, latency_statistic_t *statistic_ptr, uint8_t *expected_heartbeat_ptr, const bool print_during_receive);
+void process_received_message(can_message_t *message, const bool print_during_receive);
 
 // debug send message
 void debug_send_message(can_message_t *message, const bool print_during_send);
+
+// log message in a example 
+void log_message(const bool send, can_message_t *message, const bool print_details);
 
 // --- enumerate senders ---------------------------------------------------------------------------
 typedef enum {

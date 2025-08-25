@@ -29,7 +29,7 @@ void app_main(void)
     const uint32_t send_interval_ms = 10;
     bool print_during_send = false;
     uint64_t index = 0;
-    const uint64_t max_index = 1000;
+    const uint64_t max_index = 2000;
     sender_id_t sender_id = SENDER_ID_1;
 
     // identify your self as sender
@@ -47,15 +47,16 @@ void app_main(void)
             ESP_LOGE(TAG, "Failed to send message");
             print_can_message(&message);
 
-            // next heartbeat
-            heartbeat = next_heartbeat(heartbeat);
         }
         else {
             debug_send_message(&message, print_during_send);
             index++;
         }
 
-        // Sometimes send extra tag for latency measurement
+        // next heartbeat
+        heartbeat = next_heartbeat(heartbeat);
+
+        // Sometimes send extra tag for end of sequence
         sender_id = (index % max_index == 0) ? END_TAG_ID : SENDER_ID_1;
 
         // wait for send interval

@@ -56,7 +56,7 @@ void init_hardware(can_config_t *hw_config_ptr)
         },
         .spi_dev = {
             .mode = 0,                  // SPI mode 0 (CPOL=0, CPHA=0)
-            .clock_speed_hz = 40000000, // 40 MHz SPI clock speed
+            .clock_speed_hz = 10000000, // 10 MHz (40 MHz was before)
             .spics_io_num = CS_GPIO,
             .queue_size = 1024,         // Increased queue size
             .flags = 0,
@@ -69,7 +69,7 @@ void init_hardware(can_config_t *hw_config_ptr)
         .spi_host = SPI_HOST            // Add SPI host to config
     };
 
-#elif CONFIG_CAN_BACKEND_MCP_MULTI
+#elif CONFIG_CAN_BACKEND_MCP2515_MULTI 
     // init multi-MCP controller
 #elif CONFIG_CAN_BACKEND_ARDUINO
     // init Arduino driver

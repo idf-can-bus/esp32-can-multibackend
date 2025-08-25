@@ -31,15 +31,12 @@ void app_main(void)
 
     // --- global variables -------------------------------------------------------------------------
     can_message_t message;
-    uint8_t expected_heartbeat = 0;
-    latency_statistic_t latency_statistic;
     bool success = false;
 
     // --- example settings ------------------------------------------------------------------------
     bool print_during_send = false;
-    const uint32_t receive_interval_ms = 10;
+    const uint32_t receive_interval_ms = 1;
 
-    reset_latency_statistic(&latency_statistic);
 
     // identify your self as receiver   
     ESP_LOGI(TAG, "Receiver pool, single controller");
@@ -50,10 +47,13 @@ void app_main(void)
         success = canif_receive(&message);
         if (success)
         {
-            process_received_message(&message, &latency_statistic, &expected_heartbeat, print_during_send);
+            process_received_message(&message, print_during_send);
         }
         
-        // wait a while - vždy
+        // feed watchdog
+        esp_task_wdt_reset();
+
+        // wait a while
         vTaskDelay(pdMS_TO_TICKS(receive_interval_ms));
     }
 }
