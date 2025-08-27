@@ -25,7 +25,7 @@ import logging
 
 
 # Import our modules
-from py.flash_app_gui import FlashAppGui
+from py.app_gui import AppGui
 
 def main(logging_level):
     parser = argparse.ArgumentParser(description="ESP32 Flash Tool")
@@ -51,7 +51,7 @@ def main(logging_level):
     else:
         logging.getLogger().setLevel(logging.INFO)
 
-    app = FlashAppGui(
+    app = AppGui(
         kconfig_path=args.kconfig, 
         sdkconfig_path=args.sdkconfig, 
         idf_setup_path=args.idf_setup,

@@ -16,17 +16,7 @@ from textual.widgets import Button, RichLog, Header, Footer, Select, Label
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from rich_log_handler import RichLogHandler
 from commands import ShellCommand, ShellCommandRunner
-
-# Configure logging with custom handler
-logger = logging.getLogger(__name__)
-rich_log_handler = RichLogHandler()
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s: %(message)s',
-    handlers=[rich_log_handler]
-)
 
 
 class RunnerTestGuiApp(App, ShellCommandRunner):

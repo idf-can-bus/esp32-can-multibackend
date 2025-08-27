@@ -15,12 +15,16 @@ from typing import List, Optional
 import threading
 
 from .commands import ShellCommand,ShellCommandRunner
-from .kconfig_options import ConfigOption, KconfigMenuItems
-from .sdkconfig_options import Sdkconfig
+from py.config.kconfig_options import ConfigOption, KconfigMenuItems
+from py.config.sdkconfig_options import Sdkconfig
+from py.monitor.fake_monitor_logic import FakeMonitorLogic
+from py.monitor.serial_monitor_logic import SerialMonitorLogic
+from .log.rich_log_handler import LogSource, RichLogHandler
 
-logger = logging.getLogger(__name__)
+config_logger = RichLogHandler.get_logger(LogSource.CONFIG)
+reconfig_logger = RichLogHandler.get_logger(LogSource.RECONFIG)
 
-class FlashAppLogic(ShellCommandRunner):
+class FlashApp(ShellCommandRunner):
     """
     Logic class for ESP32 flash operations
     Handles all business logic separate from GUI
@@ -47,7 +51,11 @@ class FlashAppLogic(ShellCommandRunner):
         self.compilation_process = None
         self.compilation_lib_id = None
         self.compilation_example_id = None
-        
+
+        # Monitor logic instance
+        # @TODO: Change to FlashMonitorLogic for real monitoring FlashMonitorLogic()
+        # self.monitor_logic = SerialMonitorLogic()
+        self.monitor_logic = FakeMonitorLogic()
         self.re_init()
 
     def re_init(self):
@@ -86,35 +94,35 @@ class FlashAppLogic(ShellCommandRunner):
         lib_option = self.get_lib_option_by_id(lib_id)
         example_option = self.get_example_option_by_id(example_id)
 
-        logger.debug(f"{prompt_char} lib_id='{lib_id}', lib_option={lib_option}")
-        logger.debug(f"{prompt_char} example_id='{example_id}', example_option={example_option}")
+        config_logger.debug(f"{prompt_char} lib_id='{lib_id}', lib_option={lib_option}")
+        config_logger.debug(f"{prompt_char} example_id='{example_id}', example_option={example_option}")
 
         if not lib_option or not example_option:
-            logger.debug(f"{prompt_char} One or both options not found")
+            config_logger.debug(f"{prompt_char} One or both options not found")
             return False
 
         # If example has no dependencies, it's always compatible
         if not example_option.depends_on:
-            logger.debug(f"{prompt_char} No dependencies required - compatible")
+            config_logger.debug(f"{prompt_char} No dependencies required - compatible")
             return True
 
         # Check if selected lib ID is in the depends_on list
         if lib_option.id in example_option.depends_on:
-            logger.debug(f"{prompt_char} {lib_option.id} found in dependencies {example_option.depends_on} -> OK")
+            config_logger.debug(f"{prompt_char} {lib_option.id} found in dependencies {example_option.depends_on} -> OK")
             return True
         else:
-            logger.debug(f"{prompt_char} {lib_option.id} NOT found in dependencies {example_option.depends_on} -> FAIL")
+            config_logger.debug(f"{prompt_char} {lib_option.id} NOT found in dependencies {example_option.depends_on} -> FAIL")
             return False
 
-    def update_sdkconfig(self, lib_id: str, example_id: str, prompt_char: str = '✏️') -> bool:
+    def update_sdkconfig(self, lib_id: str, example_id: str ) -> bool:
         """Update sdkconfig using new Sdkconfig classes"""
         try:
-            logger.info(f"{prompt_char} Updating sdkconfig for lib='{lib_id}' and example='{example_id}'")
+            reconfig_logger.info(f"Updating sdkconfig for lib='{lib_id}' and example='{example_id}'")
 
             # Step 1: Get all config option IDs from KconfigMenuItems
             all_options = self.kconfig_dict.get_all_options()
             config_ids = list(all_options.keys())
-            logger.debug(f"{prompt_char} Found {len(config_ids)} config options: {config_ids}")
+            reconfig_logger.debug(f"Found {len(config_ids)} config options: {config_ids}")
 
             # Step 2: Find relevant SdkconfigLines for these IDs
             relevant_lines = {}
@@ -122,9 +130,9 @@ class FlashAppLogic(ShellCommandRunner):
                 line = self.sdkconfig.get_line_by_key(config_id)
                 if line:
                     relevant_lines[config_id] = line
-                    logger.debug(f"Found existing line for {config_id}: {line.value}")
+                    config_logger.debug(f"Found existing line for {config_id}: {line.value}")
                 else:
-                    logger.debug(
+                    config_logger.debug(
                         f"Config {config_id} not found in sdkconfig (should have been added during initialization)")
 
             # Step 3: Set values based on selections
@@ -135,77 +143,97 @@ class FlashAppLogic(ShellCommandRunner):
                 # Determine new value based on selection
                 if config_id == lib_id:
                     new_value = 'y'
-                    logger.info(f"{prompt_char} ENABLE: {config_id} (selected lib)")
+                    reconfig_logger.info(f"ENABLE: {config_id} (selected lib)")
                 elif config_id == example_id:
                     new_value = 'y'
-                    logger.info(f"{prompt_char} ENABLE: {config_id} (selected example)")
+                    reconfig_logger.info(f"ENABLE: {config_id} (selected example)")
                 else:
                     new_value = 'n'
-                    logger.debug(f"{prompt_char} DISABLE: {config_id} (not selected)")
+                    reconfig_logger.debug(f"DISABLE: {config_id} (not selected)")
 
                 # Update line if value changed
                 if line.value != new_value:
                     line.set_value(new_value)
                     changes_made += 1
-                    logger.debug(f"{prompt_char} Changed {config_id}: {line.value} -> {new_value}")
+                    reconfig_logger.debug(f"Changed {config_id}: {line.value} -> {new_value}")
 
             # Step 4: Write sdkconfig if any changes were made
             if changes_made > 0:
-                logger.info(f"{prompt_char} Writing sdkconfig with {changes_made} changes")
+                reconfig_logger.info(f"Writing sdkconfig with {changes_made} changes")
                 self.sdkconfig.write()
-                logger.info(f"{prompt_char} Successfully updated sdkconfig")
+                reconfig_logger.info(f"Successfully updated sdkconfig")
             else:
-                logger.info("No changes needed in sdkconfig")
+                config_logger.info("No changes needed in sdkconfig")
 
             return True
 
         except Exception as e:
-            logger.error(f"Failed to update sdkconfig: {e}")
+            config_logger.error(f"Failed to update sdkconfig: {e}")
             import traceback
-            logger.debug(traceback.format_exc())
+            config_logger.debug(traceback.format_exc())
             return False
 
-    def _update_config(self, lib_id: str, example_id: str, prompt_char: str = '✏️') -> bool:
+    def _update_config(self, lib_id: str, example_id: str) -> bool:
         """
         Step 1: Update sdkconfig configuration
         Returns True if successful, False otherwise
         """
-        return self.update_sdkconfig(lib_id, example_id, prompt_char)
+        return self.update_sdkconfig(lib_id, example_id)
 
     def config_compile_flash(self, port: str, lib_id: str, example_id: str) -> bool:
         """
         Execute complete flash sequence: update config, compile, upload
         Returns True if all steps successful, False if any step fails
         """
+        # Stop all monitors before starting flash operations
+        self.stop_all_monitors()
+        
         # Step 1: Update sdkconfig
         if not self._update_config(lib_id, example_id):
-            logger.error("Flash sequence aborted: sdkconfig update failed")
+            config_logger.error("Flash sequence aborted: sdkconfig update failed")
             return False
-
 
         list_of_dependig_commands = [
             # Step 2: Compile code
             ShellCommand(
                 name="Compile",
                 command=f"bash -c 'source {self.idf_setup_path} && idf.py all'",
-                prompt='⚒️'
+                logger=RichLogHandler.get_logger(LogSource.BUILD)
             ),
             # Step 3: Flash firmware
             ShellCommand(
                 name=f"Flash to port '/dev/{port}'",
                 command=f"bash -c 'source {self.idf_setup_path} && idf.py -p /dev/{port} flash'",
-                prompt='⚡'
+                logger=RichLogHandler.get_logger(LogSource.FLASH, f'FLASH to {port}')
             )
         ]
 
         # Run command in a separate thread to keep UI responsive
         thread = threading.Thread(
             target=self.run_commands,
-            args=(list_of_dependig_commands, logger, False)
+            args=(list_of_dependig_commands, False)
         )
         thread.start()
 
         return True
+
+    def stop_all_monitors(self) -> None:
+        """Delegate to monitor logic"""
+        self.monitor_logic.stop_all_monitors()
+
+    def stop_monitor(self, port: str) -> bool:
+        """Delegate to monitor logic"""
+        return self.monitor_logic.stop_monitor(port)
+
+    def is_monitoring(self, port: str) -> bool:
+        """Delegate to monitor logic"""
+        return self.monitor_logic.is_monitoring(port)
+
+    def monitor_port(self, port: str, serial_logger: RichLogHandler) -> None:
+        """
+        Delegate monitor operation to monitor logic
+        """
+        self.monitor_logic.start_monitor(port, self.idf_setup_path, serial_logger)
 
     @staticmethod
     def find_flash_ports(default_ports: list[str] = ['Port1', 'Port2', 'Port3', 'Port4']):

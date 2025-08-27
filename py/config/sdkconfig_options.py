@@ -11,8 +11,9 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Optional, Dict, List
+from py.log.rich_log_handler import LogSource, RichLogHandler
 
-logger = logging.getLogger(__name__)
+reconfig_logger = RichLogHandler.get_logger(LogSource.RECONFIG)
 
 @dataclass
 class SdkconfigLine:
@@ -54,7 +55,7 @@ class Sdkconfig:
     def _load_sdkconfig(self) -> None:
         """Load and parse sdkconfig file"""
         if not os.path.exists(self.sdkconfig_path):
-            logger.error(f"SDKconfig file not found at {self.sdkconfig_path}")
+            reconfig_logger.error(f"SDKconfig file not found at {self.sdkconfig_path}")
             return
 
         try:
@@ -73,12 +74,12 @@ class Sdkconfig:
                     self._sdkconfig_lines[key] = SdkconfigLine(key, value, line + '\n')
                     self._keys_to_lines_number[key] = i
 
-            logger.info(f"Loaded {len(self._sdkconfig_lines)} config options from {self.sdkconfig_path}")
+            reconfig_logger.info(f"Loaded {len(self._sdkconfig_lines)} config options from {self.sdkconfig_path}")
 
         except Exception as e:
-            logger.error(f"Error loading sdkconfig: {e}")
+            reconfig_logger.error(f"Error loading sdkconfig: {e}")
             import traceback
-            logger.debug(traceback.format_exc())
+            reconfig_logger.debug(traceback.format_exc())
 
     def _normalize_key(self, key: str) -> str:
         return key if key.startswith('CONFIG_') else f'CONFIG_{key}'
@@ -98,7 +99,7 @@ class Sdkconfig:
         for key in keys:
             key = self._normalize_key(key)
             if key not in self._sdkconfig_lines:
-                logger.debug(f"Adding missing key: {key}")
+                reconfig_logger.debug(f"Adding missing key: {key}")
                 self._sdkconfig_lines[key] = SdkconfigLine(key, 'n', f"{key}=n\n")
 
     def write(self) -> None:
@@ -114,9 +115,9 @@ class Sdkconfig:
                 for line in self._sdkconfig_lines.values():
                     f.write(line.original_line)
 
-            logger.info(f"Successfully wrote sdkconfig to {self.sdkconfig_path}")
+            reconfig_logger.info(f"Successfully wrote sdkconfig to {self.sdkconfig_path}")
 
         except Exception as e:
-            logger.error(f"Error writing sdkconfig: {e}")
+            reconfig_logger.error(f"Error writing sdkconfig: {e}")
             import traceback
-            logger.debug(traceback.format_exc()) 
+            reconfig_logger.debug(traceback.format_exc()) 

@@ -9,6 +9,7 @@ import subprocess
 import time
 import select
 from dataclasses import dataclass
+from py.log.rich_log_handler import LogSource, RichLogHandler
 
 
 @dataclass
@@ -19,7 +20,7 @@ class ShellCommand:
     """
     name: str  # Name of the command, for reporting of results
     command: str
-    prompt: str
+    logger: RichLogHandler
 
 
 class ShellCommandRunner:
@@ -28,7 +29,7 @@ class ShellCommandRunner:
     Supports both stdout and stderr streams.
     """
 
-    def run_commands(self, command_obj_list: [ShellCommand], logger, show_stderr: bool = True) -> int:
+    def run_commands(self, command_obj_list: [ShellCommand], show_stderr: bool = True) -> int:
         """
         Run a shell command and display its output in real-time.
         
@@ -39,13 +40,17 @@ class ShellCommandRunner:
         Returns:
             int: Exit code of the executed command
         """
+
         if not command_obj_list:
-            logger.info("All commands executed successfully.")
+            command_logger = RichLogHandler.get_logger(LogSource.PYTHON, "SHELL")
+            command_logger.info("All commands executed successfully.")
             return 0
         # Get the first command object from the list
         command_obj = command_obj_list[0]
 
-        logger.info(f"Running command: {command_obj.name} ({command_obj.command})")
+
+
+        command_obj.logger.info(f"Running command: {command_obj.name} ({command_obj.command})")
         process = subprocess.Popen(
             command_obj.command,
             shell=True,
@@ -70,21 +75,21 @@ class ShellCommandRunner:
                     # Convert binary data to text
                     text = line.decode('utf-8').strip()
                     if stream == process.stdout:
-                        logger.info(f'{command_obj.prompt} {text}')
+                        command_obj.logger.info(text)
                     else:
                         if show_stderr:
-                            logger.error(f'{command_obj.prompt} {text}')
+                            command_obj.logger.error(text)
             # Short pause to prevent CPU overload
             time.sleep(0.01)
 
         # Process has finished, read remaining output
         for line in iter(process.stdout.readline, b''):
             text = line.decode('utf-8').strip()
-            logger.info(f'{command_obj.prompt} {text}')
+            command_obj.logger.info(text)
         if show_stderr:
             for line in iter(process.stderr.readline, b''):
                 text = line.decode('utf-8').strip()
-                logger.error(f'{command_obj.prompt} {text}')
+                command_obj.logger.error(f'text')
 
         # Close the streams
         process.stdout.close()
@@ -93,14 +98,14 @@ class ShellCommandRunner:
         # Wait for the process to complete and get the exit code
         process.wait()
         if process.returncode != 0:
-            logger.error(f"\n❌ Command '{command_obj.name}' failed with exit code {process.returncode}\n")
+            command_obj.logger.error(f"\n❌ Command '{command_obj.name}' failed with exit code {process.returncode}\n")
         else:
-            logger.info(f"\n✅ Command '{command_obj.name}' completed successfully with exit code {process.returncode}\n")
+            command_obj.logger.info(f"\n✅ Command '{command_obj.name}' completed successfully with exit code {process.returncode}\n")
 
         # If there is a next command, run it recursively
         if (process.returncode==0) :
             time.sleep(0.3)  # Optional delay before running the next command
-            return self.run_commands(command_obj_list[1:], logger, show_stderr)
+            return self.run_commands(command_obj_list[1:], show_stderr)
 
         return process.returncode
 

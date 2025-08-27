@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import List, Optional
 from pprint import pprint
 import kconfiglib
+from py.log.rich_log_handler import LogSource, RichLogHandler
 
-logger = logging.getLogger(__name__)
-
+logger = RichLogHandler.get_logger(LogSource.CONFIG)
 
 @dataclass
 class ConfigOption:

@@ -13,19 +13,18 @@ from textual.containers import Grid
 from textual.reactive import reactive
 from textual.widgets import Static, Button, Select, RichLog, Footer, LoadingIndicator
 import os
-from .flash_app_logic import FlashAppLogic
-from .rich_log_handler import RichLogHandler
+from .app_logic import FlashApp
+from .monitor.monitor_gui_logic import MonitorGuiLogic
+from py.log.rich_log_handler import LogSource, RichLogHandler
 
-# Configure logging with custom handler
-logger = logging.getLogger(__name__)
-rich_log_handler = RichLogHandler()
+python_logger = RichLogHandler.get_logger(LogSource.PYTHON)
+
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(levelname)s: %(message)s',
-    handlers=[rich_log_handler]
+    format='%(message)s',
 )
 
-class FlashAppGui(App):
+class AppGui(App):
     CSS = """
     Screen {
         layout: vertical;
@@ -37,7 +36,7 @@ class FlashAppGui(App):
     }
     
     #table {
-        grid-size: 4;
+        grid-size: 5;
         grid-gutter: 0 1;
         grid-rows: auto;
         height: auto;
@@ -58,6 +57,7 @@ class FlashAppGui(App):
         width: 95%;
         content-align: center middle;
         text-align: center;
+        /*border: solid yellow;  /* Debug: žlutý border kolem tlačítek */
     }
     
     #status {
@@ -67,7 +67,47 @@ class FlashAppGui(App):
         border: solid $primary;
     }
     
+    .monitor-button {
+        background: #2a4a6b;
+        color: white;
+        text-style: bold;
+        height: 3;
+    }
     
+    .monitor-button:hover {
+        background: #3a5a7b;
+    }
+    
+    .monitor-button.active {
+        background: #8b2a2a;
+        color: white;
+        text-style: bold;
+        height: 3;
+    }
+    
+    .monitor-button.active:hover {
+        background: #9b3a3a;
+    }
+    
+    .flash-button {
+        background: #2a6b2a;
+        color: white;
+        text-style: bold;
+        height: 3;
+    }
+    
+    .flash-button:hover {
+        background: #3a7b3a;
+    }
+    
+    .flash-button:disabled {
+        background: grey;
+        text-style: dim;
+    }
+    
+    .flash-button:disabled:hover {
+        background: grey;
+    }
     
     """
 
@@ -94,13 +134,13 @@ class FlashAppGui(App):
 
         # Check exitence of all paths, exit if any path does not exist
         if not os.path.exists(kconfig_path):
-            logger.error(f"Kconfig file not found at: '{kconfig_path}'")
+            python_logger.error(f"Kconfig file not found at: '{kconfig_path}'")
             exit(1)
         if not os.path.exists(sdkconfig_path):
-            logger.error(f"SDKconfig file not found at: '{sdkconfig_path}'")
+            python_logger.error(f"SDKconfig file not found at: '{sdkconfig_path}'")
             exit(1)
         if not os.path.exists(idf_setup_path):
-            logger.error(f"ESP-IDF setup script not found at: '{idf_setup_path}'")
+            python_logger.error(f"ESP-IDF setup script not found at: '{idf_setup_path}'")
             exit(1)
 
         self.kconfig_path = kconfig_path
@@ -108,21 +148,26 @@ class FlashAppGui(App):
         self.idf_setup_path = os.path.expanduser(idf_setup_path)
 
         # Create logic instance with reference to this GUI
-        self.logic = FlashAppLogic(idf_setup_path, kconfig_path, sdkconfig_path, gui_app=self,
+        self.logic = FlashApp(idf_setup_path, kconfig_path, sdkconfig_path, gui_app=self,
                                    menu_name="*** CAN bus examples  ***")
+        
+        # Create monitor GUI logic instance
+        self.monitor_gui_logic = MonitorGuiLogic()
 
         # Initialize ports
         self.ports = self.logic.find_flash_ports()
 
     def compose(self) -> ComposeResult:
-        yield Button("Reload ports", id="reload")
+        # Reloat dosn't work well, so hide it for now
+        # yield Button("Reload ports", id="reload")
 
         with Grid(id="table"):
             # Headers
             yield Static("Port", classes="header")
-            yield Static("Lib", classes="header")
+            yield Static("Library", classes="header")
             yield Static("Example", classes="header")
             yield Static("Flash", classes="header")
+            yield Static("Monitor/Log", classes="header")
 
             # Rows for each port
             for port in self.ports:
@@ -130,51 +175,67 @@ class FlashAppGui(App):
 
                 # Create lib select - use (display_name, id) format
                 lib_choices = [(opt.display_name, opt.id) for opt in self.logic.lib_options]
+                print('lib_choices', lib_choices)
                 lib_select = Select(lib_choices, prompt="-- Select Lib --")
+
 
                 # Create example select - use (display_name, id) format  
                 example_choices = [(opt.display_name, opt.id) for opt in self.logic.example_options]
+                print('example_choices ', example_choices)
                 example_select = Select(example_choices, prompt="-- Select Example --")
 
-                flash_button = Button(f"Flash {port}", id=f"flash-{port}", disabled=True)
+                flash_button = Button(
+                    f"⚡ Flash {port}",
+                    id=f"flash-{port}",
+                    classes="flash-button",
+                    disabled=True
+                )
+                monitor_button = Button(
+                    f"Monitor {port}",  # will be replaced by MonitorGuiLogic
+                    id=f"monitor-{port}", 
+                    classes="monitor-button",
+                    disabled=False
+                )
+                self.monitor_gui_logic.register_monitor_button(port, monitor_button)
 
                 yield lib_select
                 yield example_select
                 yield flash_button
+                yield monitor_button
 
         yield RichLog(highlight=True, id="status", name="testarea")
         yield Footer()
 
     def on_mount(self) -> None:
         # Connect the logging handler to RichLog
-        rich_log_handler.set_rich_log(self.query_one(RichLog))
+        RichLogHandler.set_rich_log(self.query_one(RichLog))
 
         # Log config file paths and loaded options on startup
-        logger.info(f"Kconfig: {self.logic.kconfig_path}")
-        logger.info(f"SDKconfig: {self.logic.sdkconfig_path}")
-        logger.info(
+        python_logger.info(f"Kconfig: {self.logic.kconfig_path}")
+        python_logger.info(f"SDKconfig: {self.logic.sdkconfig_path}")
+        python_logger.info(
             f"Loaded {len(self.logic.lib_options)} lib options, {len(self.logic.example_options)} example options")
 
         # Debug: Print all loaded options
-        logger.debug("=== LIB OPTIONS ===")
+        python_logger.debug("=== LIB OPTIONS ===")
         for opt in self.logic.lib_options:
-            logger.debug(f"  {opt.id}: {opt.display_name}")
+            python_logger.debug(f"  {opt.id}: {opt.display_name}")
 
-        logger.debug("=== EXAMPLE OPTIONS ===")
+        python_logger.debug("=== EXAMPLE OPTIONS ===")
         for opt in self.logic.example_options:
             depends_str = f", depends_on: {opt.depends_on}" if opt.depends_on else ""
-            logger.debug(f"  {opt.id}: {opt.display_name}{depends_str}")
+            python_logger.debug(f"  {opt.id}: {opt.display_name}{depends_str}")
 
     def action_clear_log(self) -> None:
         """Clear the RichLog content"""
         try:
             rich_log = self.query_one(RichLog)
             rich_log.clear()
-            logger.info("Log cleared")
+            python_logger.info("Log cleared")
         except Exception as e:
-            logger.error(f"Failed to clear log: {e}")
+            python_logger.error(f"Failed to clear log: {e}")
 
-
+                         
     def show_loading(self, message: str = "Compiling...") -> None:
         """Show loading indicator with message"""
         try:
@@ -200,10 +261,10 @@ class FlashAppGui(App):
             #     # Force app refresh to ensure immediate display
             #     self.refresh()
             # except Exception as e:
-            #     logger.error(f"Failed to write to RichLog: {e}")
+            #     python_logger.error(f"Failed to write to RichLog: {e}")
                 
         except Exception as e:
-            logger.error(f"Failed to show loading indicator: {e}")
+            python_logger.error(f"Failed to show loading indicator: {e}")
 
     def hide_loading(self) -> None:
         """Hide loading indicator"""
@@ -226,15 +287,15 @@ class FlashAppGui(App):
                 break
 
         if select_index >= 0:
-            # Calculate which row (each row has 2 selects)
+            # Calculate which row (each row has 2 selects: lib and example)
             row_index = select_index // 2
 
             # Get both selects for this row
             lib_select = all_selects[row_index * 2]
             example_select = all_selects[row_index * 2 + 1]
 
-            # Get corresponding flash button
-            flash_buttons = list(grid.query(Button))
+            # Get corresponding flash button - now we have 4 columns per row
+            flash_buttons = [btn for btn in grid.query(Button) if btn.id and btn.id.startswith("flash-")]
             if row_index < len(flash_buttons):
                 flash_button = flash_buttons[row_index]
 
@@ -250,13 +311,14 @@ class FlashAppGui(App):
                     # Log dependency check for debugging
                     example_option = self.logic.get_example_option_by_id(example_select.value)
                     if example_option and example_option.depends_on:
+                        # old code: lib_option = self.logic.get_example_option_by_id(lib_select.value)
                         lib_option = self.logic.get_lib_option_by_id(lib_select.value)
                         msg_str = f"Dependency check: {example_select.value} requires {example_option.depends_on}, " \
                                   f"selected {lib_option.id if lib_option else 'unknown'} -> {'OK' if dependencies_ok else 'FAIL'}"
                         if dependencies_ok:
-                            logger.debug(msg_str)
+                            python_logger.debug(msg_str)
                         else:
-                            logger.warning(msg_str)
+                            python_logger.warning(msg_str)
 
                 # Button is enabled only when both are selected AND dependencies are satisfied
                 all_conditions_met = lib_selected and example_selected and dependencies_ok
@@ -264,32 +326,67 @@ class FlashAppGui(App):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "reload":
-            self.ports = self.logic.find_flash_ports()
-            # Reload logic
-            self.logic.re_init()
-            logger.info("Ports and config reloaded")
-            self.refresh(recompose=True)
-
+            self._on_reload_pressed(event)
         elif event.button.id and event.button.id.startswith("flash-"):
-            port = event.button.id.replace("flash-", "")
+            self._on_flash_pressed(event)
+        elif event.button.id and event.button.id.startswith("monitor-"):
+            self._on_monitor_pressed(event)
 
-            # Find corresponding selects for this button
-            grid = self.query_one("#table")
-            buttons = [btn for btn in grid.query(Button) if btn.id and btn.id.startswith("flash-")]
+    def _on_reload_pressed(self, event: Button.Pressed) -> None:
+        self.logic.stop_all_monitors()
+        self.ports = self.logic.find_flash_ports()
+        # Reload logic
+        self.logic.re_init()
+        python_logger.info("Ports and config reloaded")
+        self.refresh(recompose=True)
 
-            for i, btn in enumerate(buttons):
-                if btn == event.button:
-                    # 4 columns now: port, lib, example, flash
-                    base_idx = 4 + i * 4  # Skip header row (4 items), then i rows of 4 columns each
-                    lib_select = grid.children[base_idx + 1]  # lib is 2nd column (index 1)
-                    example_select = grid.children[base_idx + 2]  # example is 3rd column (index 2)
+    def _on_flash_pressed(self, event: Button.Pressed) -> None:
+        port = event.button.id.replace("flash-", "")
+        self.logic.stop_all_monitors()
 
-                    # Execute flash sequence asynchronously to keep GUI responsive
-                    self.run_worker(
-                        self._flash_worker(port, lib_select.value, example_select.value),
-                        name=f"flash_{port}"
-                    )
-                    break
+        # Find corresponding selects for this button
+        grid = self.query_one("#table")
+        buttons = [btn for btn in grid.query(Button) if btn.id and btn.id.startswith("flash-")]
+
+        for i, btn in enumerate(buttons):
+            if btn == event.button:
+                # 4 columns now: port, lib, example, flash
+                base_idx = 5 + i * 5  # Skip header row (5 items), then i rows of 5 columns each
+                lib_select = grid.children[base_idx + 1]  # lib is 2nd column (index 1)
+                example_select = grid.children[base_idx + 2]  # example is 3rd column (index 2)
+
+                # Execute flash sequence asynchronously to keep GUI responsive
+                self.run_worker(
+                    self._flash_worker(port, lib_select.value, example_select.value),
+                    name=f"flash_{port}"
+                )
+                break
+
+    def _on_monitor_pressed(self, event: Button.Pressed) -> None:
+        port = event.button.id.replace("monitor-", "")
+        serial_logger = RichLogHandler.get_logger(LogSource.SERIAL, port)
+            
+        if self.logic.is_monitoring(port):
+            # Stop monitoring
+            if self.logic.stop_monitor(port):
+                self.monitor_gui_logic.set_monitor_state(port, False)
+                serial_logger.info(f" Monitoring stopped on port {port}")
+        else:
+            # Start monitoring
+            self.run_worker(
+                self._monitor_worker(port, serial_logger),
+                name=f"monitor_{port}"
+            )
+            self.monitor_gui_logic.set_monitor_state(port, True)
+
+    async def _monitor_worker(self, port: str, serial_logger: RichLogHandler):
+        """Async worker for monitor operation"""
+        try:
+            self.logic.monitor_port(port, serial_logger)
+        except Exception as e:
+            serial_logger.error(f"❌ Monitor operation failed with exception: {e}")
+            import traceback
+            serial_logger.debug(traceback.format_exc())
 
     async def _flash_worker(self, port: str, lib_id: str, example_id: str):
         """Async worker for flash operation"""
@@ -301,6 +398,6 @@ class FlashAppGui(App):
             # (v _compile_code a _flash_firmware), takže zde není potřeba nic logovat
             
         except Exception as e:
-            logger.error(f"❌ Flash operation failed with exception: {e}")
+            python_logger.error(f"❌ Flash operation failed with exception: {e}")
             import traceback
-            logger.debug(traceback.format_exc()) 
+            python_logger.debug(traceback.format_exc()) 
