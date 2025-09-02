@@ -54,60 +54,58 @@ class SerialMonitorLogic(BaseMonitorLogic):
                 text=False,  # Use binary mode for non-blocking reads
                 bufsize=0    # Disable buffering
             )
-            
-            # Use custom log format for this monitor
-            with self.custom_log_format(port):
-                # Main loop runs until the process completes or is stopped
-                while process.poll() is None:
-                    # Check if monitor was stopped
-                    if stop_event.is_set():
-                        serial_logger.info(f"Monitor on port {port} was stopped")
-                        break
-                    
-                    # Wait for data from either stdout or stderr with timeout
-                    readable, _, _ = select.select([process.stdout, process.stderr], [], [], 0.1)
 
-                    # Process all available outputs
-                    for stream in readable:
-                        # Read all available data from the current stream
-                        while True:
-                            line = stream.readline()
-                            if not line:  # No more data available
-                                break
-                            # Convert binary data to text
-                            text = line.decode('utf-8', errors='ignore').strip()
-                            if text:  # Only log non-empty lines
-                                if stream == process.stdout:
-                                    serial_logger.info(text)
-                                else:
-                                    serial_logger.warning(text)
-                    
-                    # Short pause to prevent CPU overload
-                    time.sleep(0.01)
-                
-                # Process has finished, read remaining output
-                for line in iter(process.stdout.readline, b''):
-                    text = line.decode('utf-8', errors='ignore').strip()
-                    if text:
-                        serial_logger.info(f'{text}')
-                
-                for line in iter(process.stderr.readline, b''):
-                    text = line.decode('utf-8', errors='ignore').strip()
-                    if text:
-                        serial_logger.warning(f'{text}')
-                
-                # Close the streams
-                process.stdout.close()
-                process.stderr.close()
-                
-                # Wait for the process to complete and get the exit code
-                process.wait()
-                
-                if process.returncode != 0:
-                    serial_logger.warning(f"Monitor on port {port} stopped with exit code {process.returncode}")
-                else:
-                    serial_logger.info(f"Monitor on port {port} completed successfully")
-                    
+            # Main loop runs until the process completes or is stopped
+            while process.poll() is None:
+                # Check if monitor was stopped
+                if stop_event.is_set():
+                    serial_logger.info(f"Monitor on port {port} was stopped")
+                    break
+
+                # Wait for data from either stdout or stderr with timeout
+                readable, _, _ = select.select([process.stdout, process.stderr], [], [], 0.1)
+
+                # Process all available outputs
+                for stream in readable:
+                    # Read all available data from the current stream
+                    while True:
+                        line = stream.readline()
+                        if not line:  # No more data available
+                            break
+                        # Convert binary data to text
+                        text = line.decode('utf-8', errors='ignore').strip()
+                        if text:  # Only log non-empty lines
+                            if stream == process.stdout:
+                                serial_logger.info(text)
+                            else:
+                                serial_logger.warning(text)
+
+                # Short pause to prevent CPU overload
+                time.sleep(0.01)
+
+            # Process has finished, read remaining output
+            for line in iter(process.stdout.readline, b''):
+                text = line.decode('utf-8', errors='ignore').strip()
+                if text:
+                    serial_logger.info(f'{text}')
+
+            for line in iter(process.stderr.readline, b''):
+                text = line.decode('utf-8', errors='ignore').strip()
+                if text:
+                    serial_logger.warning(f'{text}')
+
+            # Close the streams
+            process.stdout.close()
+            process.stderr.close()
+
+            # Wait for the process to complete and get the exit code
+            process.wait()
+
+            if process.returncode != 0:
+                serial_logger.warning(f"Monitor on port {port} stopped with exit code {process.returncode}")
+            else:
+                serial_logger.info(f"Monitor on port {port} completed successfully")
+
         except Exception as e:
             serial_logger.error(f"Monitor on port {port} failed with exception: {e}")
             import traceback

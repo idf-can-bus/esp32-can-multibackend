@@ -3,16 +3,15 @@
 __author__ = "Ivo Marvan"
 __email__ = "ivo@marvan.cz"
 __description__ = '''
-Custom logging handler for Textual RichLog widget.
+Custom logging handler for Textual RichLog (RichLogExtened) widget.
 Provides real-time log message display in the GUI with proper formatting.
 '''
 
 import logging
 import re
 from enum import Enum
-
 from textual.widgets import RichLog
-
+from py.log.rich_log_extended import RichLogExtended
 
 class LogSource(Enum):
     """
@@ -44,14 +43,16 @@ class LogSource(Enum):
 
 class RichLogHandler(logging.Handler):
     """
-    Custom logging handler for RichLog
-    This class is used to log messages to a RichLog widget
+    Custom logging handler for RichLog (RichLogExtened)
+    This class is used to log messages to a RichLog (RichLogExtened) widget
     It is used to display the log messages in a more readable format.
     """
     registered_loggers = {}
-    _rich_log = None  # Shared RichLog instance for all handlers
+    _rich_log = None  # Shared RichLog (RichLogExtened) instance for all handlers
 
     # Pre-compiled regex patterns for automatic level detection
+    # @TODO: implement level detection from message content
+    # Currently used only for error and warning levels to avoid unintended level changes
     _level_patterns = {
         logging.ERROR: [
             re.compile(r'\b(error|Error|ERROR)\b'),
@@ -70,6 +71,7 @@ class RichLogHandler(logging.Handler):
         ]
     }
 
+    # set RichLog or his subclass (like RichLogExtened) instance
     @classmethod
     def set_rich_log(cls, rich_log: RichLog):
         cls._rich_log = rich_log

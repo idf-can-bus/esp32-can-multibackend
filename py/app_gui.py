@@ -12,6 +12,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Grid
 from textual.reactive import reactive
 from textual.widgets import Static, Button, Select, RichLog, Footer, LoadingIndicator
+from py.log.rich_log_extended import RichLogExtended
 import os
 from .app_logic import FlashApp
 from .monitor.monitor_gui_logic import MonitorGuiLogic
@@ -23,6 +24,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(message)s',
 )
+
 
 class AppGui(App):
     CSS = """
@@ -123,9 +125,12 @@ class AppGui(App):
             kconfig_path: str = "./main/Kconfig.projbuild",
             sdkconfig_path: str = "./sdkconfig",
             idf_setup_path: str = "~/esp/v5.4.1/esp-idf/export.sh",
-            logging_level: int = logging.DEBUG
+            logging_level: int = logging.DEBUG,
+            debug: bool = False
     ):
+        self._debug = debug
         super().__init__()
+        
 
         # Expand user paths
         kconfig_path = os.path.expanduser(kconfig_path)
@@ -203,12 +208,28 @@ class AppGui(App):
                 yield flash_button
                 yield monitor_button
 
-        yield RichLog(highlight=True, id="status", name="testarea")
+        if self._debug:
+            yield Button(
+                f"RichLogStatistics",
+                id=f"richlog-statistics",
+                classes="flash-button",
+                disabled=False
+            )
+
+        # Use RichLogExtended instead of RichLog
+        yield RichLogExtended(
+            highlight=True, 
+            id="status", 
+            name="testarea",
+            max_lines=2000,        # More lines for long outputs
+            buffer_size=20,        # Larger buffer for better performance
+            flush_interval=0.05    # More frequent flushing for responsiveness
+        )
         yield Footer()
 
     def on_mount(self) -> None:
-        # Connect the logging handler to RichLog
-        RichLogHandler.set_rich_log(self.query_one(RichLog))
+        # Connect the logging handler to RichLogExtended
+        RichLogHandler.set_rich_log(self.query_one(RichLogExtended))
 
         # Log config file paths and loaded options on startup
         python_logger.info(f"Kconfig: {self.logic.kconfig_path}")
@@ -331,6 +352,8 @@ class AppGui(App):
             self._on_flash_pressed(event)
         elif event.button.id and event.button.id.startswith("monitor-"):
             self._on_monitor_pressed(event)
+        elif event.button.id == "richlog-statistics":
+            self._on_show_stats_pressed(event)
 
     def _on_reload_pressed(self, event: Button.Pressed) -> None:
         self.logic.stop_all_monitors()
@@ -370,7 +393,7 @@ class AppGui(App):
             # Stop monitoring
             if self.logic.stop_monitor(port):
                 self.monitor_gui_logic.set_monitor_state(port, False)
-                serial_logger.info(f" Monitoring stopped on port {port}")
+                serial_logger.info(f" --- Monitoring stopped on port {port} ---")
         else:
             # Start monitoring
             self.run_worker(
@@ -401,3 +424,9 @@ class AppGui(App):
             python_logger.error(f"❌ Flash operation failed with exception: {e}")
             import traceback
             python_logger.debug(traceback.format_exc()) 
+        
+    # For debugging purposes, add a button to show statistics
+    def _on_show_stats_pressed(self, event: Button.Pressed) -> None:
+        """Show RichLogExtended statistics"""
+        rich_log = self.query_one(RichLogExtended)
+        rich_log.print_stats()

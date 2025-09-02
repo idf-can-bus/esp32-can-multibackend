@@ -30,36 +30,6 @@ class BaseMonitorLogic(ABC):
         self.monitor_lock = threading.Lock()
         self.original_format = None
 
-    @contextmanager
-    def custom_log_format(self, port: str):
-        """
-        Context manager for custom log format with port prefix.
-        Temporarily changes the log format to include port identification.
-        Automatically restores the original format when exiting the context.
-        """
-        try:
-            # Store original format
-            root_logger = logging.getLogger()
-            if root_logger.handlers:
-                self.original_format = root_logger.handlers[0].formatter._fmt
-            
-            # Create custom formatter with port prefix
-            custom_format = f'%(levelname)s: {port} %(message)s'
-            custom_formatter = logging.Formatter(custom_format)
-            
-            # Apply custom formatter to all handlers
-            for handler in root_logger.handlers:
-                handler.setFormatter(custom_formatter)
-            
-            yield  # Execute the monitored code
-            
-        finally:
-            # Restore original format
-            if self.original_format:
-                original_formatter = logging.Formatter(self.original_format)
-                for handler in root_logger.handlers:
-                    handler.setFormatter(original_formatter)
-
     def stop_all_monitors(self) -> None:
         """
         Stop all active monitoring processes.

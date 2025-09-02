@@ -42,6 +42,10 @@ def main(logging_level):
     parser.add_argument('-v', '--verbose',
                         action='store_true',
                         help="Enable verbose logging")
+    
+    parser.add_argument('-d', '--debug',
+                        action='store_true',
+                        help="Enable debug mode")
 
     args = parser.parse_args()
 
@@ -55,7 +59,10 @@ def main(logging_level):
         kconfig_path=args.kconfig, 
         sdkconfig_path=args.sdkconfig, 
         idf_setup_path=args.idf_setup,
-        logging_level=logging_level)
+        logging_level=logging_level,
+        debug=args.debug
+    )
+
     app.run()
 
 
