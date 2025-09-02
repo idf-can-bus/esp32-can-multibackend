@@ -46,6 +46,10 @@ def main(logging_level):
     parser.add_argument('-d', '--debug',
                         action='store_true',
                         help="Enable debug mode")
+    
+    parser.add_argument('-f', '--fake-monitor',
+                        action='store_true',
+                        help="Use fake monitor"),
 
     args = parser.parse_args()
 
@@ -60,7 +64,8 @@ def main(logging_level):
         sdkconfig_path=args.sdkconfig, 
         idf_setup_path=args.idf_setup,
         logging_level=logging_level,
-        debug=args.debug
+        debug=args.debug,
+        use_fake_monitor=args.fake_monitor
     )
 
     app.run()

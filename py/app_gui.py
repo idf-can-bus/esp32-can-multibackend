@@ -8,14 +8,15 @@ Features real-time compilation output, port detection, and dependency validation
 '''
 
 import logging
+import traceback
+import os
 from textual.app import App, ComposeResult
 from textual.containers import Grid
 from textual.reactive import reactive
 from textual.widgets import Static, Button, Select, RichLog, Footer, LoadingIndicator
 from py.log.rich_log_extended import RichLogExtended
-import os
 from .app_logic import FlashApp
-from .monitor.monitor_gui_logic import MonitorGuiLogic
+from .monitor.shell_monitor_logic import ShellMonitorLogic
 from py.log.rich_log_handler import LogSource, RichLogHandler
 
 python_logger = RichLogHandler.get_logger(LogSource.PYTHON)
@@ -126,7 +127,8 @@ class AppGui(App):
             sdkconfig_path: str = "./sdkconfig",
             idf_setup_path: str = "~/esp/v5.4.1/esp-idf/export.sh",
             logging_level: int = logging.DEBUG,
-            debug: bool = False
+            debug: bool = False,
+            use_fake_monitor: bool = False
     ):
         self._debug = debug
         super().__init__()
@@ -153,14 +155,24 @@ class AppGui(App):
         self.idf_setup_path = os.path.expanduser(idf_setup_path)
 
         # Create logic instance with reference to this GUI
-        self.logic = FlashApp(idf_setup_path, kconfig_path, sdkconfig_path, gui_app=self,
-                                   menu_name="*** CAN bus examples  ***")
+        self.logic = FlashApp(
+            idf_setup_path, 
+            kconfig_path, 
+            sdkconfig_path, 
+            gui_app=self,
+            menu_name="*** CAN bus examples  ***"
+        )
         
         # Create monitor GUI logic instance
-        self.monitor_gui_logic = MonitorGuiLogic()
+        self.monitor_logic = ShellMonitorLogic(
+            idf_setup_path=idf_setup_path,
+            use_fake_monitor=use_fake_monitor
+        )
+
+        self.use_fake_monitor = use_fake_monitor
 
         # Initialize ports
-        self.ports = self.logic.find_flash_ports()
+        self.ports, self.real_ports_found = self.logic.find_flash_ports()
 
     def compose(self) -> ComposeResult:
         # Reloat dosn't work well, so hide it for now
@@ -196,12 +208,12 @@ class AppGui(App):
                     disabled=True
                 )
                 monitor_button = Button(
-                    f"Monitor {port}",  # will be replaced by MonitorGuiLogic
+                    f"Monitor {port}",  # will be replaced by ShellMonitorLogic
                     id=f"monitor-{port}", 
                     classes="monitor-button",
-                    disabled=False
+                    disabled=not (self.use_fake_monitor or self.real_ports_found)
                 )
-                self.monitor_gui_logic.register_monitor_button(port, monitor_button)
+                self.monitor_logic.register_monitor_button(port, monitor_button)
 
                 yield lib_select
                 yield example_select
@@ -212,19 +224,21 @@ class AppGui(App):
             yield Button(
                 f"RichLogStatistics",
                 id=f"richlog-statistics",
-                classes="flash-button",
-                disabled=False
+                classes="flash-button"                
             )
 
         # Use RichLogExtended instead of RichLog
-        yield RichLogExtended(
+        rich_log = RichLogExtended(
             highlight=True, 
             id="status", 
             name="testarea",
             max_lines=2000,        # More lines for long outputs
             buffer_size=20,        # Larger buffer for better performance
-            flush_interval=0.05    # More frequent flushing for responsiveness
+            flush_interval=0.05,   # More frequent flushing for responsiveness
+            markup=True           # Enable Markup
         )
+        yield rich_log
+
         yield Footer()
 
     def on_mount(self) -> None:
@@ -356,8 +370,8 @@ class AppGui(App):
             self._on_show_stats_pressed(event)
 
     def _on_reload_pressed(self, event: Button.Pressed) -> None:
-        self.logic.stop_all_monitors()
-        self.ports = self.logic.find_flash_ports()
+        # self.monitor_logic.stop_all_monitors()
+        self.ports, self.real_ports_found = self.logic.find_flash_ports()
         # Reload logic
         self.logic.re_init()
         python_logger.info("Ports and config reloaded")
@@ -365,7 +379,6 @@ class AppGui(App):
 
     def _on_flash_pressed(self, event: Button.Pressed) -> None:
         port = event.button.id.replace("flash-", "")
-        self.logic.stop_all_monitors()
 
         # Find corresponding selects for this button
         grid = self.query_one("#table")
@@ -380,50 +393,28 @@ class AppGui(App):
 
                 # Execute flash sequence asynchronously to keep GUI responsive
                 self.run_worker(
-                    self._flash_worker(port, lib_select.value, example_select.value),
+                    self.logic.config_compile_flash(port, lib_select.value, example_select.value),
                     name=f"flash_{port}"
                 )
                 break
 
     def _on_monitor_pressed(self, event: Button.Pressed) -> None:
         port = event.button.id.replace("monitor-", "")
-        serial_logger = RichLogHandler.get_logger(LogSource.SERIAL, port)
-            
-        if self.logic.is_monitoring(port):
+        
+        if self.monitor_logic.is_monitoring(port):
             # Stop monitoring
-            if self.logic.stop_monitor(port):
-                self.monitor_gui_logic.set_monitor_state(port, False)
+            if self.monitor_logic.stop_monitor(port):
+                serial_logger = RichLogHandler.get_logger(LogSource.SERIAL, port)
                 serial_logger.info(f" --- Monitoring stopped on port {port} ---")
         else:
             # Start monitoring
-            self.run_worker(
-                self._monitor_worker(port, serial_logger),
-                name=f"monitor_{port}"
-            )
-            self.monitor_gui_logic.set_monitor_state(port, True)
+            if self.monitor_logic.start_monitor(port):
+                # Get the process and run it asynchronously with cleanup
+                self.run_worker(
+                    self.monitor_logic.run_monitor_with_cleanup(port),  # ✅ Nová metoda s cleanup
+                    name=f"monitor_{port}"
+                )
 
-    async def _monitor_worker(self, port: str, serial_logger: RichLogHandler):
-        """Async worker for monitor operation"""
-        try:
-            self.logic.monitor_port(port, serial_logger)
-        except Exception as e:
-            serial_logger.error(f"❌ Monitor operation failed with exception: {e}")
-            import traceback
-            serial_logger.debug(traceback.format_exc())
-
-    async def _flash_worker(self, port: str, lib_id: str, example_id: str):
-        """Async worker for flash operation"""
-        try:
-            # Execute flash sequence using logic and handle result
-            self.logic.config_compile_flash(port, lib_id, example_id)
-            
-            # Zprávy o úspěchu/neúspěchu jsou již zalogovány v jednotlivých krocích
-            # (v _compile_code a _flash_firmware), takže zde není potřeba nic logovat
-            
-        except Exception as e:
-            python_logger.error(f"❌ Flash operation failed with exception: {e}")
-            import traceback
-            python_logger.debug(traceback.format_exc()) 
         
     # For debugging purposes, add a button to show statistics
     def _on_show_stats_pressed(self, event: Button.Pressed) -> None:

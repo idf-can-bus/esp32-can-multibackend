@@ -84,28 +84,30 @@ class RichLogHandler(logging.Handler):
         If logger is not registered, it is created wiht coresponding handler and registered.
         If logger is registered, it is returned.
         """
+        logger_key = (source, display_name)
+    
         # check if logger with given source and display_name is already registered
         try:
-            return cls.registered_loggers[source][display_name]
+            return cls.registered_loggers[logger_key]
         except KeyError:
-            if not source in cls.registered_loggers:
-                cls.registered_loggers[source] = {}
             # create handler for source
             handler = RichLogHandler(source, display_name)
-            # create logger with handler
-            logger = logging.getLogger(source.display_name)
+            # Unique logger name
+            logger_name = f"{source.display_name}.{display_name}" if display_name else source.display_name
+            logger = logging.getLogger(logger_name)
             # Remove all existing handlers
             for h in logger.handlers[:]:  
                 logger.removeHandler(h)
             logger.addHandler(handler)
             logger.propagate = False
-            cls.registered_loggers[source][display_name] = logger   
+            cls.registered_loggers[logger_key] = logger   
             return logger
 
-    def __init__(self, source: LogSource = LogSource.PYTHON, display_name: str = None):
+    def __init__(self, source: LogSource = LogSource.PYTHON, display_name: str = None, extra_color: str = None):
         super().__init__()
         self._source = source
         self._source_display_name = display_name
+        self._extra_color = extra_color
 
     def emit(self, record: logging.LogRecord):
         if self._rich_log:
@@ -124,7 +126,12 @@ class RichLogHandler(logging.Handler):
         )
 
     def _modify_message(self, record: logging.LogRecord = None) -> logging.LogRecord:
-        # Modify the log message to include source emoji and display name
+        '''
+        Modify the log message to include source emoji and display name
+        If extra_color is set, add it to the message
+
+        @TODO: add extra_color to the message
+        '''
         if self._source_display_name:
             record.msg = f"{self._source.emoji} {self._source_display_name}: {record.msg}"
         else:

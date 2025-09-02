@@ -4,6 +4,7 @@ __author__ = "Ivo Marvan"
 __email__ = "ivo@marvan.cz"
 __description__ = '''
 Module for running shell commands and capturing their output in real-time.
+@deprecated: Use py.shell_commands.ShellCommandConfig instead.
 '''
 import subprocess
 import time

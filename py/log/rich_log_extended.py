@@ -36,15 +36,16 @@ class RichLogExtended(RichLog):
         self.total_flush_time = 0.0
         self.avg_flush_time = 0.0
         self.emergency_flush_count = 0
+
+        self._flush_timer = None
     
     def write(self, content: Any, width: Optional[int] = None, 
               expand: bool = False, shrink: bool = True, 
               scroll_end: Optional[bool] = None, animate: bool = False) -> 'RichLogExtended':
         """
-        Override write method to add buffering with auto-throttling.
-        Maintains full API compatibility with RichLog.write()
+        Override write method with timer-based flushing
         """
-        # Store original parameters for later use
+        # Store original parameters
         write_params = {
             'content': content,
             'width': width,
@@ -56,6 +57,12 @@ class RichLogExtended(RichLog):
         
         self.buffer.append(write_params)
         
+        # Force flush on error messages
+        content_str = str(content)
+        if any(error_word in content_str.lower() for error_word in ['error', 'failed', 'exception', '❌']):
+            self._flush_buffer()
+            return self
+        
         # Auto-throttling: emergency flush if buffer is too large
         if len(self.buffer) > self.buffer_size * 2:
             self.emergency_flush_count += 1
@@ -63,30 +70,46 @@ class RichLogExtended(RichLog):
             return self
         
         # Normal flush conditions
-        should_flush = (
-            len(self.buffer) >= self.buffer_size or
-            time.time() - self._last_flush >= self.flush_interval
-        )
-        
-        if should_flush:
+        if len(self.buffer) >= self.buffer_size:
             self._flush_buffer()
+            return self
         
-        return self  # Method chaining support
+        # Start timer for interval-based flushing
+        self._start_flush_timer()
+        
+        return self
     
-    async def async_write(self, content: Any, width: Optional[int] = None, 
-                         expand: bool = False, shrink: bool = True, 
-                         scroll_end: Optional[bool] = None, animate: bool = False) -> 'RichLogExtended':
+    def _start_flush_timer(self):
         """
-        Async version of write for asyncio processes.
-        Thread-safe version that can be called from asyncio code.
+        Start timer for automatic flushing
         """
-        async with self._async_lock:
-            return self.write(content, width, expand, shrink, scroll_end, animate)
+        # Cancel existing timer
+        if self._flush_timer and not self._flush_timer.done():
+            self._flush_timer.cancel()
+        
+        # Start new timer
+        self._flush_timer = asyncio.create_task(self._timer_flush())
+    
+    async def _timer_flush(self):
+        """
+        Timer-based flush
+        """
+        await asyncio.sleep(self.flush_interval)
+        
+        # Check if buffer still has content
+        if self.buffer:
+            self._flush_buffer()
     
     def _flush_buffer(self) -> None:
-        """Flush buffered content to actual RichLog with statistics"""
+        """
+        Flush buffered content to actual RichLog
+        """
         if not self.buffer:
             return
+        
+        # Cancel timer if running
+        if self._flush_timer and not self._flush_timer.done():
+            self._flush_timer.cancel()
         
         # Measure flush time
         flush_start = time.time()

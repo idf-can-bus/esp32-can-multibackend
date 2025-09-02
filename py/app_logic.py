@@ -9,22 +9,22 @@ Manages the complete workflow from Kconfig parsing to ESP32 flashing.
 '''
 
 import glob
-import logging
 import re
-from typing import List, Optional
-import threading
+from typing import List, Optional, Type, Any
+import traceback
+            
+from py.shell_commands import ShellCommandConfig, ShellCommandProcess
 
-from .commands import ShellCommand,ShellCommandRunner
 from py.config.kconfig_options import ConfigOption, KconfigMenuItems
 from py.config.sdkconfig_options import Sdkconfig
-from py.monitor.fake_monitor_logic import FakeMonitorLogic
-from py.monitor.serial_monitor_logic import SerialMonitorLogic
 from .log.rich_log_handler import LogSource, RichLogHandler
 
 config_logger = RichLogHandler.get_logger(LogSource.CONFIG)
 reconfig_logger = RichLogHandler.get_logger(LogSource.RECONFIG)
+build_logger = RichLogHandler.get_logger(LogSource.BUILD)
+flash_logger = RichLogHandler.get_logger(LogSource.FLASH)
 
-class FlashApp(ShellCommandRunner):
+class FlashApp:
     """
     Logic class for ESP32 flash operations
     Handles all business logic separate from GUI
@@ -36,8 +36,10 @@ class FlashApp(ShellCommandRunner):
             kconfig_path: str = "./main/Kconfig.projbuild",
             sdkconfig_path: str = "./sdkconfig",
             gui_app=None,
-            menu_name: str = "*** CAN bus examples  ***"
+            menu_name: str = "*** CAN bus examples  ***",
+            *args, **kwargs
     ):
+        super().__init__(*args, **kwargs)
         self.idf_setup_path = idf_setup_path
         self.kconfig_path = kconfig_path
         self.sdkconfig_path = sdkconfig_path
@@ -52,10 +54,6 @@ class FlashApp(ShellCommandRunner):
         self.compilation_lib_id = None
         self.compilation_example_id = None
 
-        # Monitor logic instance
-        # @TODO: Change to FlashMonitorLogic for real monitoring FlashMonitorLogic()
-        # self.monitor_logic = SerialMonitorLogic()
-        self.monitor_logic = FakeMonitorLogic()
         self.re_init()
 
     def re_init(self):
@@ -114,7 +112,7 @@ class FlashApp(ShellCommandRunner):
             config_logger.debug(f"{prompt_char} {lib_option.id} NOT found in dependencies {example_option.depends_on} -> FAIL")
             return False
 
-    def update_sdkconfig(self, lib_id: str, example_id: str ) -> bool:
+    def _update_sdkconfig(self, lib_id: str, example_id: str ):
         """Update sdkconfig using new Sdkconfig classes"""
         try:
             reconfig_logger.info(f"Updating sdkconfig for lib='{lib_id}' and example='{example_id}'")
@@ -163,90 +161,120 @@ class FlashApp(ShellCommandRunner):
                 self.sdkconfig.write()
                 reconfig_logger.info(f"Successfully updated sdkconfig")
             else:
-                config_logger.info("No changes needed in sdkconfig")
+                reconfig_logger.info("No changes needed in sdkconfig")
 
             return True
 
         except Exception as e:
             config_logger.error(f"Failed to update sdkconfig: {e}")
-            import traceback
-            config_logger.debug(traceback.format_exc())
+            config_logger.info(traceback.format_exc())
             return False
 
-    def _update_config(self, lib_id: str, example_id: str) -> bool:
-        """
-        Step 1: Update sdkconfig configuration
-        Returns True if successful, False otherwise
-        """
-        return self.update_sdkconfig(lib_id, example_id)
 
-    def config_compile_flash(self, port: str, lib_id: str, example_id: str) -> bool:
+    async def call_with_results(
+        self, target: ShellCommandConfig | Type[Any], 
+        name: str, logger: RichLogHandler, 
+        *args, **kwargs) -> bool:
+        """
+        Call a target function or class with arguments and log results.
+        :param target: Function or class to call.
+        :param name: Name of the operation.
+        :param logger: Logger instance to use.
+        :param args: Arguments to pass to the target.
+        :param kwargs: Keyword arguments to pass to the target.
+        :return: True if successful, False otherwise.
+        """ 
+        def log_start():
+            logger.info(f"--- {name} starts 🚀 ---\n") 
+        
+        def log_success(success: bool):
+            if success:
+                logger.info(f"=== {name} completed ✅ ===") 
+            else:
+                logger.error(f"!!! {name} failed ❌ !!!") 
+
+        try:
+            if isinstance(target, ShellCommandConfig):
+                # run asynchrounously
+                process = ShellCommandProcess(config=target, logger=logger)
+                log_start()
+                success = await process.run_end_wait()
+                log_success(success)
+                return success
+            elif callable(target):
+                # run synchronously python function/method
+                result = target(*args, **kwargs)
+                if isinstance(result, bool):
+                    log_success(result)
+                    return result
+                else:
+                    log_success(True)
+                return True
+            else:
+                raise TypeError("First argument must be ShellCommandConfig or a function.")
+        except Exception as e:
+            logger.error(f"!!! {name} failed ❌: {e} !!!")
+            logger.info(traceback.format_exc())
+            return False
+        
+
+    async def config_compile_flash(self, port: str, lib_id: str, example_id: str) -> bool:
         """
         Execute complete flash sequence: update config, compile, upload
         Returns True if all steps successful, False if any step fails
         """
-        # Stop all monitors before starting flash operations
-        self.stop_all_monitors()
-        
+
+        # python_logger.info(f"config_compile_flash")
         # Step 1: Update sdkconfig
-        if not self._update_config(lib_id, example_id):
-            config_logger.error("Flash sequence aborted: sdkconfig update failed")
+        success1 = await self.call_with_results(
+            target=self._update_sdkconfig, 
+            name="Update sdkconfig", 
+            logger=reconfig_logger, 
+            lib_id=lib_id, example_id=example_id
+        )
+        # python_logger.info(f"Step 1: Update sdkconfig success1={success1}")
+        if not success1:
             return False
 
-        list_of_dependig_commands = [
-            # Step 2: Compile code
-            ShellCommand(
-                name="Compile",
-                command=f"bash -c 'source {self.idf_setup_path} && idf.py all'",
-                logger=RichLogHandler.get_logger(LogSource.BUILD)
-            ),
-            # Step 3: Flash firmware
-            ShellCommand(
-                name=f"Flash to port '/dev/{port}'",
-                command=f"bash -c 'source {self.idf_setup_path} && idf.py -p /dev/{port} flash'",
-                logger=RichLogHandler.get_logger(LogSource.FLASH, f'FLASH to {port}')
-            )
-        ]
-
-        # Run command in a separate thread to keep UI responsive
-        thread = threading.Thread(
-            target=self.run_commands,
-            args=(list_of_dependig_commands, False)
+        # Step 2: Run building asynchronously
+        success2 = await self.call_with_results(
+            name="Compile ESP32 firmware",
+            target=ShellCommandConfig(
+                name="Compile ESP32 firmware",  
+                command=f"bash -c 'source {self.idf_setup_path} && idf.py all'",                              
+            ), 
+            logger=build_logger, 
         )
-        thread.start()
+        # build_logger.info(f"\nStep 2: Compile ESP32 firmware success2={success2}\n")
+        if not success2:
+            return False
 
-        return True
+        # Step 3: Flash firmware
+        success3 = await self.call_with_results(
+            name=f"Flash firmware to /dev/{port}",
+            target=ShellCommandConfig(
+                name=f"Flash firmware to /dev/{port}", 
+                command=f"bash -c 'source {self.idf_setup_path} && idf.py -p /dev/{port} flash'",                               
+            ), 
+            logger=flash_logger, 
+        )
+        #  flash_logger.info(f"\nStep 3: Flash firmware to /dev/{port} success3={success3}\n")
+        return success3
 
-    def stop_all_monitors(self) -> None:
-        """Delegate to monitor logic"""
-        self.monitor_logic.stop_all_monitors()
-
-    def stop_monitor(self, port: str) -> bool:
-        """Delegate to monitor logic"""
-        return self.monitor_logic.stop_monitor(port)
-
-    def is_monitoring(self, port: str) -> bool:
-        """Delegate to monitor logic"""
-        return self.monitor_logic.is_monitoring(port)
-
-    def monitor_port(self, port: str, serial_logger: RichLogHandler) -> None:
-        """
-        Delegate monitor operation to monitor logic
-        """
-        self.monitor_logic.start_monitor(port, self.idf_setup_path, serial_logger)
-
-    @staticmethod
-    def find_flash_ports(default_ports: list[str] = ['Port1', 'Port2', 'Port3', 'Port4']):
+    
+    def find_flash_ports(self, default_ports: list[str] = ['Port1', 'Port2', 'Port3', 'Port4']) -> tuple[list[str], bool]:
         """Find available flash ports"""
+        real_ports_found = False
         ports = glob.glob('/dev/ttyACM*')
         flash_ports1 = sorted(p[5:] for p in ports if re.match(r'/dev/ttyACM\d+$', p))
         ports = glob.glob('/dev/ttyUSB*')
         flash_ports2 = sorted(p[5:] for p in ports if re.match(r'/dev/ttyUSB\d+$', p))
         flash_ports = flash_ports1 + flash_ports2
         if not flash_ports:
-            return default_ports
+            return default_ports, real_ports_found
         else:
-            return flash_ports
+            real_ports_found = True
+            return flash_ports, real_ports_found
 
     def load_kconfig_options(self) -> tuple[List[ConfigOption], List[ConfigOption]]:
         """Load lib and example options from Kconfig file using KconfigMenuItems"""
