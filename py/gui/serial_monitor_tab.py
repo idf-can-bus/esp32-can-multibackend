@@ -5,9 +5,8 @@ __description__ = '''
 '''
 
 from textual.app import ComposeResult
-from textual.containers import Grid
 from textual.containers import Grid, Container
-from textual.widgets import Static, Button, TextArea
+from textual.widgets import Static, Button, Log
 from py.log.rich_log_handler import RichLogHandler
 from py.monitor.shell_monitor_logic import ShellMonitorLogic
 
@@ -16,17 +15,16 @@ class SerialMonitorsTab(Container):
 
 
     """Tab with monitor controls (left) and monitor outputs (right)."""
-    def __init__(self, ports, python_logger: RichLogHandler) -> None:
+    def __init__(self, ports, python_logger: RichLogHandler, monitor_logic:ShellMonitorLogic, max_log_lines:int = 500) -> None:
         super().__init__(id="serial-monitors-tab")
         self.ports = ports
         self.python_logger = python_logger
-        self.active_monitor_logs = {}  # port -> TextArea widget
+        self.max_log_lines = max_log_lines
+        self.active_monitor_logs = {}  # port -> Log widget
+        self.monitor_visibility = {}  # port -> bool (True = visible, False = hidden)
         
         # Initialize monitor logic
-        self.monitor_logic = ShellMonitorLogic(
-            read_timeout=0.01,  # 10ms read timeout
-            write_timeout=0.01  # 10ms write timeout
-        )
+        self.monitor_logic = monitor_logic
 
     def _monitor_table(self) -> ComposeResult:
         # headers
@@ -66,19 +64,10 @@ class SerialMonitorsTab(Container):
             self._add_monitor_log(port)
             self.python_logger.debug(f"Show monitor for port {port}")
         else:
-            # Hide the monitor log for this port
+            # Hide the monitor log for this port (monitoring continues in background)
             event.button.label = "+ Show"
-            
-            # If monitoring is active, stop it first
-            if self.monitor_logic.is_monitoring(port):
-                self._stop_monitoring(port)
-                # Update run button to Start state
-                run_button = self.query_one(f"#run-{port}")
-                run_button.label = "▶ Start"
-                self.python_logger.debug(f"Stopped monitoring for port {port} due to hide")
-            
             self._remove_monitor_log(port)
-            self.python_logger.debug(f"Hide monitor for port {port}")
+            self.python_logger.debug(f"Hide monitor for port {port} (monitoring continues)")
 
     def _on_run_pressed(self, event: Button.Pressed) -> None:
         """Handle start/stop button toggle for port monitoring"""
@@ -102,13 +91,42 @@ class SerialMonitorsTab(Container):
         else:
             # Stop monitoring
             event.button.label = "▶ Start"
-            self._stop_monitoring(port)
+            # Run async stop in background
+            self.app.run_worker(self._stop_monitoring(port), exclusive=False)
             self.python_logger.debug(f"Stop monitoring port {port}")
 
     def _add_monitor_log(self, port: str) -> None:
-        """Add TextArea for monitoring port output"""
+        """Show Log for monitoring port output (create if doesn't exist)"""
         try:
             right_panel = self.query_one("#serial-right-panel")
+            
+            # Check if Log already exists
+            if port in self.active_monitor_logs:
+                # Log exists, just show it
+                container = self.query_one(f"#monitor-container-{port}")
+                container.styles.display = "block"
+                self.monitor_visibility[port] = True
+                self.python_logger.debug(f"Showed existing monitor log for port {port}")
+            else:
+                # Create new Log
+                monitor_container = Container(id=f"monitor-container-{port}", classes="monitor-container")
+                title = Static(f"Monitor: {port}", classes="monitor-title")
+                serial_logger = Log(
+                    id=f"serial-logger-{port}",
+                    classes="serial-logger",
+                    max_lines=self.max_log_lines
+                )
+                
+                # Mount container and then add content
+                right_panel.mount(monitor_container)
+                monitor_container.mount(title)
+                monitor_container.mount(serial_logger)
+                
+                # Store reference
+                self.active_monitor_logs[port] = serial_logger
+                self.monitor_visibility[port] = True
+                
+                self.python_logger.debug(f"Created monitor log for port {port}")
             
             # Remove placeholder if it exists
             try:
@@ -117,74 +135,63 @@ class SerialMonitorsTab(Container):
             except:
                 pass
             
-            # Create container for this port's monitor
-            monitor_container = Container(id=f"monitor-container-{port}", classes="monitor-container")
-            title = Static(f"Monitor: {port}", classes="monitor-title")
-            serial_logger = TextArea(
-                id=f"serial-logger-{port}",
-                classes="serial-logger",
-                read_only=True
-            )
-            
-            # Mount container and then add content
-            right_panel.mount(monitor_container)
-            monitor_container.mount(title)
-            monitor_container.mount(serial_logger)
-            
-            # Store reference for later removal
-            self.active_monitor_logs[port] = serial_logger
-            
-            # Rebalance heights
+            # Rebalance heights of visible logs
             self._rebalance_monitor_logs()
-            
-            self.python_logger.debug(f"Added monitor log for port {port}")
             
         except Exception as e:
             self.python_logger.error(f"Failed to add monitor log for port {port}: {e}")
 
     def _remove_monitor_log(self, port: str) -> None:
-        """Remove TextArea for monitoring port output"""
+        """Hide Log for monitoring port output (don't delete it)"""
         try:
-            container = self.query_one(f"#monitor-container-{port}")
-            container.remove()
-            
-            # Remove from tracking
             if port in self.active_monitor_logs:
-                del self.active_monitor_logs[port]
-            
-            # Check if we need to restore placeholder
-            right_panel = self.query_one("#serial-right-panel")
-            if not list(right_panel.query(Container)):
-                placeholder = Static("Monitor Output - monitors will appear here", id="monitor-placeholder")
-                right_panel.mount(placeholder)
-            else:
-                # Rebalance remaining logs
-                self._rebalance_monitor_logs()
+                container = self.query_one(f"#monitor-container-{port}")
+                container.styles.display = "none"
+                self.monitor_visibility[port] = False
                 
-            self.python_logger.debug(f"Removed monitor log for port {port}")
+                self.python_logger.debug(f"Hidden monitor log for port {port}")
+                
+                # Check if we need to restore placeholder (all logs hidden)
+                if not any(self.monitor_visibility.values()):
+                    right_panel = self.query_one("#serial-right-panel")
+                    try:
+                        # Only add placeholder if it doesn't exist
+                        self.query_one("#monitor-placeholder")
+                    except:
+                        placeholder = Static("Monitor Output - monitors will appear here", id="monitor-placeholder")
+                        right_panel.mount(placeholder)
+                else:
+                    # Rebalance remaining visible logs
+                    self._rebalance_monitor_logs()
             
         except Exception as e:
-            self.python_logger.error(f"Failed to remove monitor log for port {port}: {e}")
+            self.python_logger.error(f"Failed to hide monitor log for port {port}: {e}")
 
     def _rebalance_monitor_logs(self) -> None:
-        """Rebalance heights of all active serial loggers"""
+        """Rebalance heights of all visible serial loggers"""
         try:
             if not self.active_monitor_logs:
                 return
-                
-            right_panel = self.query_one("#serial-right-panel")
-            containers = list(right_panel.query(Container))
             
-            if not containers:
+            # Count visible logs
+            visible_count = sum(1 for visible in self.monitor_visibility.values() if visible)
+            
+            if visible_count == 0:
                 return
                 
-            # Calculate height per container (equal distribution)
-            height_per_container = f"{100 // len(containers)}%"
+            # Calculate height per visible container (equal distribution)
+            height_per_container = f"{100 // visible_count}%"
             
-            for container in containers:
-                container.styles.height = height_per_container
+            # Apply height only to visible containers
+            for port, visible in self.monitor_visibility.items():
+                if visible:
+                    try:
+                        container = self.query_one(f"#monitor-container-{port}")
+                        container.styles.height = height_per_container
+                    except:
+                        pass
                 
-            self.python_logger.debug(f"Rebalanced {len(containers)} serial loggers")
+            self.python_logger.debug(f"Rebalanced {visible_count} visible serial loggers")
             
         except Exception as e:
             self.python_logger.error(f"Failed to rebalance serial loggers: {e}")
@@ -214,10 +221,10 @@ class SerialMonitorsTab(Container):
         except Exception as e:
             self.python_logger.error(f"Error starting monitoring for port {port}: {e}")
 
-    def _stop_monitoring(self, port: str) -> None:
+    async def _stop_monitoring(self, port: str) -> None:
         """Stop monitoring process for given port"""
         try:
-            success = self.monitor_logic.stop_monitor_for_gui(port)
+            success = await self.monitor_logic.stop_monitor_for_gui(port)
             
             if success:
                 self.python_logger.debug(f"Successfully stopped monitoring for port {port}")

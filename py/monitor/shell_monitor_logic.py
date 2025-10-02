@@ -44,8 +44,12 @@ class PortMonitorProcess:
         self.stdout_buffer = ""
         self.stderr_buffer = ""
         
+        # Tasks for stream handling
+        self.stdout_task = None
+        self.stderr_task = None
+        
     async def start(self) -> int:
-        """Start monitor process and stream output directly to RichLog."""
+        """Start monitor process and stream output directly to Log."""
         try:
             self.process = await asyncio.create_subprocess_shell(
                 self.config.command,
@@ -55,12 +59,12 @@ class PortMonitorProcess:
             self.running = True
             
             # Stream stdout and stderr in parallel
-            stdout_task = asyncio.create_task(self._stream_output(self.process.stdout, prefix=""))
-            stderr_task = asyncio.create_task(self._stream_output(self.process.stderr, prefix="STDERR: "))
+            self.stdout_task = asyncio.create_task(self._stream_output(self.process.stdout, prefix=""))
+            self.stderr_task = asyncio.create_task(self._stream_output(self.process.stderr, prefix="STDERR: "))
             
             # Wait for finish
             await self.process.wait()
-            await asyncio.gather(stdout_task, stderr_task, return_exceptions=True)
+            await asyncio.gather(self.stdout_task, self.stderr_task, return_exceptions=True)
             
             return self.process.returncode
             
@@ -69,7 +73,7 @@ class PortMonitorProcess:
             return -1
             
     async def _stream_output(self, stream, prefix: str = ""):
-        """Stream output from subprocess stream to RichLog widget character by character."""
+        """Stream output from subprocess stream to Log widget character by character."""
         try:
             # Choose appropriate buffer
             buffer = self.stdout_buffer if prefix == "" else self.stderr_buffer
@@ -121,14 +125,10 @@ class PortMonitorProcess:
     
     def _write_to_textarea(self, text: str) -> None:
         """Write text to TextArea widget."""
+        # remove \r characters to avoid issues
+        text = text.replace('\r', '')
         try:
-            # Check if widget has text property (TextArea) or write method (RichLog)
-            if hasattr(self.port_log_widget, 'text'):
-                # TextArea - append to existing text
-                self.port_log_widget.text += text
-            else:
-                # Fallback for RichLog or other widgets
-                self.port_log_widget.write(text)
+            self.port_log_widget.write(text)
         except Exception as e:
             # Fallback to print if widget methods fail
             print(f"Error writing to widget: {e}")
@@ -138,11 +138,32 @@ class PortMonitorProcess:
         return_code = await self.start()
         return return_code == 0
         
-    def terminate(self) -> None:
-        """Terminate the running process."""
+    async def terminate(self) -> None:
+        """Terminate the running process gracefully."""
         if self.process and self.running:
-            self.process.terminate()
             self.running = False
+            try:
+                self.process.terminate()
+                # Wait a bit for graceful termination
+                try:
+                    await asyncio.wait_for(self.process.wait(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    # Force kill if doesn't terminate gracefully
+                    self.process.kill()
+                    await self.process.wait()
+                
+                # Wait for stream tasks to complete
+                if self.stdout_task:
+                    await asyncio.wait_for(self.stdout_task, timeout=0.5)
+                if self.stderr_task:
+                    await asyncio.wait_for(self.stderr_task, timeout=0.5)
+                    
+            except asyncio.TimeoutError:
+                # Tasks didn't complete in time, that's okay
+                pass
+            except Exception as e:
+                print(f"Error terminating process: {e}")
+
 
 class ShellMonitorLogic:
     """
@@ -168,7 +189,7 @@ class ShellMonitorLogic:
         Args:
             idf_setup_path: Path to ESP-IDF setup script
             read_timeout: Timeout for reading from subprocess (seconds)
-            write_timeout: Timeout for writing to RichLog (seconds)
+            write_timeout: Timeout for writing to Log (seconds)
             buffer_size: Buffer size for output (0 = immediate output, no buffering)
         """
         self.idf_setup_path = os.path.expanduser(idf_setup_path)
@@ -179,8 +200,11 @@ class ShellMonitorLogic:
         # Active monitor processes - key: port, value: PortMonitorProcess
         self.active_monitors: Dict[str, PortMonitorProcess] = {}
         
-        # Mapping port to RichLog widget for serial output
+        # Mapping port to Log widget for serial output
         self.port_loggers: Dict[str, object] = {}  # Changed from RichLogExtended to generic object
+        
+        # Track worker tasks for cleanup
+        self.worker_tasks: Dict[str, object] = {}  # port -> worker task
     
     def start_monitor_for_gui(self, port: str, monitor_log_widget, gui_run_worker_method) -> bool:
         """
@@ -188,7 +212,7 @@ class ShellMonitorLogic:
         
         Args:
             port: Port identifier to monitor
-            monitor_log_widget: RichLog widget to stream to
+            monitor_log_widget: Log widget to stream to
             gui_run_worker_method: GUI run_worker method for async execution
             
         Returns:
@@ -212,7 +236,7 @@ class ShellMonitorLogic:
             command=command
         )
         
-        # Create process that writes directly to RichLog
+        # Create process that writes directly to Log
         process = PortMonitorProcess(
             config=config, 
             port_log_widget=monitor_log_widget,
@@ -224,15 +248,16 @@ class ShellMonitorLogic:
         # Store process
         self.active_monitors[port] = process
         
-        # Start process asynchronously via GUI
-        gui_run_worker_method(
+        # Start process asynchronously via GUI and track the worker
+        worker = gui_run_worker_method(
             self.run_monitor_with_cleanup(port),
             name=f"monitor_{port}"
         )
+        self.worker_tasks[port] = worker
         
         return True
         
-    def stop_monitor_for_gui(self, port: str) -> bool:
+    async def stop_monitor_for_gui(self, port: str) -> bool:
         """
         Stop monitoring on specific port.
         
@@ -246,7 +271,20 @@ class ShellMonitorLogic:
             return False
             
         process = self.active_monitors[port]
-        process.terminate()
+        await process.terminate()
+        
+        # Wait for worker task to complete
+        if port in self.worker_tasks:
+            worker = self.worker_tasks[port]
+            try:
+                # Wait for worker to finish with timeout
+                await asyncio.wait_for(worker.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                print(f"Worker for port {port} didn't finish in time")
+            except Exception as e:
+                print(f"Error waiting for worker: {e}")
+            del self.worker_tasks[port]
+        
         del self.active_monitors[port]
         
         # Also clean up port loggers
@@ -259,7 +297,7 @@ class ShellMonitorLogic:
         """Check if port is being monitored."""
         return port in self.active_monitors
         
-    def stop_all_monitors(self) -> int:
+    async def stop_all_monitors(self) -> int:
         """
         Stop all active monitor processes.
         
@@ -271,7 +309,7 @@ class ShellMonitorLogic:
         
         for port in ports_to_stop:
             try:
-                if self.stop_monitor_for_gui(port):
+                if await self.stop_monitor_for_gui(port):
                     stopped_count += 1
             except Exception as e:
                 # Log error but continue with other monitors
@@ -305,15 +343,11 @@ class ShellMonitorLogic:
             
         process = self.active_monitors[port]
         
-        # Get RichLog widget for this port 
+        # Get Log widget for this port 
         port_logger = self.port_loggers.get(port)
         
         try:
-            if port_logger:
-                if hasattr(port_logger, 'text'):
-                    port_logger.text += f"--- Monitor on port {port} starts 🚀 ---\n"
-                else:
-                    port_logger.write(f"--- Monitor on port {port} starts 🚀 ---\n")
+            port_logger.write(f"--- Monitor on port {port} starts 🚀 ---\n")
 
             # Run the process and wait for completion
             success = await process.run_end_wait()
@@ -327,26 +361,17 @@ class ShellMonitorLogic:
                 del self.port_loggers[port]
                 
             if port_logger:
-                if hasattr(port_logger, 'text'):
-                    if success:
-                        port_logger.text += f"=== Monitor on port {port} completed successfully ✅ ===\n"
-                    else:
-                        port_logger.text += f"!!! Monitor on port {port} finished with errors ❌ !!!\n"
+                if success:
+                    port_logger.write(f"\n=== Monitor on port {port} completed successfully ✅ ===\n")
                 else:
-                    if success:
-                        port_logger.write(f"=== Monitor on port {port} completed successfully ✅ ===\n")
-                    else:
-                        port_logger.write(f"!!! Monitor on port {port} finished with errors ❌ !!!\n")
+                    port_logger.write(f"\n!!! Monitor on port {port} finished with errors ❌ !!!\n")
                 
             return success
             
         except Exception as e:
             # Process failed with exception
             if port_logger:
-                if hasattr(port_logger, 'text'):
-                    port_logger.text += f"Monitor on port {port} failed: {e}\n"
-                else:
-                    port_logger.write(f"Monitor on port {port} failed: {e}\n")
+                port_logger.write(f"Monitor on port {port} failed: {e}\n")
             
             # Clean up
             if port in self.active_monitors:

@@ -9,6 +9,8 @@ Features real-time compilation output, port detection, and dependency validation
 
 import logging
 import os
+import time
+
 from textual.app import App, ComposeResult
 from textual.reactive import reactive
 from textual.widgets import Button, Footer, TabbedContent, TabPane
@@ -96,21 +98,26 @@ class AppGui(App):
                     debug=self._debug
                 )
             with TabPane("Serial Monitors"):
-                yield SerialMonitorsTab(self.ports, python_logger)
+                yield SerialMonitorsTab(self.ports, python_logger, self.monitor_logic, max_log_lines=500)
 
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         pass # No buttons in main window yet
 
-    def action_quit(self) -> None:
+    async def action_quit(self) -> None:
+        """Quit application, stopping all monitors gracefully."""
         # Stop all active monitor processes before quitting
         try:
-            stopped_count = self.monitor_logic.stop_all_monitors()
+            stopped_count = await self.monitor_logic.stop_all_monitors()
             if stopped_count > 0:
                 python_logger.info(f"Stopped {stopped_count} active monitor process(es) before quitting")
+            # Give a small delay for cleanup to complete
+            await asyncio.sleep(0.2)
         except Exception as e:
             python_logger.error(f"Error stopping monitor processes: {e}")
         finally:
             # Exit application
+            time.sleep(1)  # Ensure all logs are flushed
+    
             self.exit()
