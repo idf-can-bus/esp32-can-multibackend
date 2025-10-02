@@ -43,16 +43,20 @@ class AppGui(App):
             idf_setup_path: str = "~/esp/v5.4.1/esp-idf/export.sh",
             debug: bool = False
     ):
+        """
+        Initialize ESP32 Flash Tool GUI application.
+        
+        Args:
+            kconfig_path: Path to Kconfig.projbuild file
+            sdkconfig_path: Path to sdkconfig file
+            idf_setup_path: Path to ESP-IDF setup script
+            debug: Enable debug features in GUI
+        """
         self._debug = debug
         super().__init__()
-        
-
-        # Expand user paths
         kconfig_path = os.path.expanduser(kconfig_path)
         sdkconfig_path = os.path.expanduser(sdkconfig_path)
         idf_setup_path = os.path.expanduser(idf_setup_path)
-
-        # Check exitence of all paths, exit if any path does not exist
         if not os.path.exists(kconfig_path):
             python_logger.error(f"Kconfig file not found at: '{kconfig_path}'")
             exit(1)
@@ -66,8 +70,6 @@ class AppGui(App):
         self.kconfig_path = kconfig_path
         self.sdkconfig_path = sdkconfig_path
         self.idf_setup_path = os.path.expanduser(idf_setup_path)
-
-        # Create logic instance with reference to this GUI
         self.logic = FlashApp(
             idf_setup_path, 
             kconfig_path, 
@@ -75,16 +77,12 @@ class AppGui(App):
             gui_app=self,
             menu_name="*** CAN bus examples  ***"
         )
-        
-        # Create monitor GUI logic instance
         self.monitor_logic = ShellMonitorLogic(
             idf_setup_path=idf_setup_path,
             read_timeout=0.01,
             write_timeout=0.01,
-            buffer_size=0  # 0 = immediate output, no buffering
+            buffer_size=0
         )
-
-        # Initialize ports
         self.ports, self.real_ports_found = self.logic.find_flash_ports()
 
     def compose(self) -> ComposeResult:
@@ -103,21 +101,21 @@ class AppGui(App):
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        pass # No buttons in main window yet
+        """Handle button events from main window."""
+        pass
 
     async def action_quit(self) -> None:
-        """Quit application, stopping all monitors gracefully."""
-        # Stop all active monitor processes before quitting
+        """
+        Quit application gracefully.
+        Stops all active monitor processes before shutting down to prevent subprocess errors.
+        """
         try:
             stopped_count = await self.monitor_logic.stop_all_monitors()
             if stopped_count > 0:
                 python_logger.info(f"Stopped {stopped_count} active monitor process(es) before quitting")
-            # Give a small delay for cleanup to complete
             await asyncio.sleep(0.2)
         except Exception as e:
             python_logger.error(f"Error stopping monitor processes: {e}")
         finally:
-            # Exit application
-            time.sleep(1)  # Ensure all logs are flushed
-    
+            time.sleep(1)
             self.exit()

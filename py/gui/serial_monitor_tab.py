@@ -2,6 +2,9 @@
 __author__ = "Ivo Marvan"
 __email__ = "ivo@marvan.cz"
 __description__ = '''
+Serial monitor tab for Textual GUI application.
+Provides controls for managing multiple serial port monitors with show/hide and start/stop functionality.
+Monitors continue running in background when hidden and preserve their log history.
 '''
 
 from textual.app import ComposeResult
@@ -12,9 +15,12 @@ from py.monitor.shell_monitor_logic import ShellMonitorLogic
 
 
 class SerialMonitorsTab(Container):
-
-
-    """Tab with monitor controls (left) and monitor outputs (right)."""
+    """
+    Serial monitoring tab with dual-panel layout.
+    Left panel: control buttons for show/hide and start/stop monitoring.
+    Right panel: log outputs for each monitored port.
+    Supports multiple concurrent monitors with automatic height distribution.
+    """
     def __init__(self, ports, python_logger: RichLogHandler, monitor_logic:ShellMonitorLogic, max_log_lines:int = 500) -> None:
         super().__init__(id="serial-monitors-tab")
         self.ports = ports
@@ -27,12 +33,10 @@ class SerialMonitorsTab(Container):
         self.monitor_logic = monitor_logic
 
     def _monitor_table(self) -> ComposeResult:
-        # headers
+        """Generate monitor control table with headers and rows for each port."""
         yield Static("Port", classes="header")
         yield Static("Open", classes="header")
         yield Static("Run", classes="header")
-
-        # rows
         for port in self.ports:
             yield Static(port, classes="port-name")
             yield Button("+ Show", id=f"open-{port}", classes="open-button", disabled=False)

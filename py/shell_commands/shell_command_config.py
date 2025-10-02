@@ -3,20 +3,22 @@
 __author__ = "Ivo Marvan"
 __email__ = "ivo@marvan.cz"
 __description__ = '''
-Configuration for a system command process.
-Includes command line, output color, and other display parameters.
+Configuration dataclass for shell command execution.
+Stores command name and shell command string for subprocess execution.
 '''
 
 class ShellCommandConfig:
     """
-    Configuration for a system command process.
-    Includes command line, output color, and other display parameters.
+    Configuration container for shell command execution.
+    Simple dataclass holding command name and command string.
     """
     def __init__(self, name: str, command: str):
         """
-        Initialize the configuration for a system command.
-        :param name: Human-readable name for the command.
-        :param command: Command line to execute.
+        Initialize shell command configuration.
+        
+        Args:
+            name: Human-readable command name for logging
+            command: Shell command string to execute
         """
         self.name = name or command
         self.command = command

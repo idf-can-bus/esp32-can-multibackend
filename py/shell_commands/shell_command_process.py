@@ -3,44 +3,48 @@
 __author__ = "Ivo Marvan"
 __email__ = "ivo@marvan.cz"
 __description__ = '''
-Classes for asynchronous execution and management of system commands,
-with real-time output streaming to RichText widgets.
+Asynchronous shell command execution with output streaming.
+Manages subprocess lifecycle, output capture, and error detection.
+Supports pause/resume, termination, and real-time logging.
 '''
 from typing import Callable, Any
 import asyncio
 import logging
 import re
 from py.shell_commands.shell_command_config import ShellCommandConfig
-# from rich.console import Console
-# from rich.text import Text
 
 
 class ShellCommandProcess:
     """
-    Manages the execution of a system command and keeps a registry of all instances.
-    Supports asynchronous output streaming, pausing, resuming, and termination.
+    Asynchronous shell command executor with output streaming and lifecycle management.
+    Captures stdout/stderr, detects errors, supports pause/resume.
+    Maintains global registry of all active instances.
     """
     _instances = set()
 
     def __init__(self, config: ShellCommandConfig, logger: logging.Handler):
         """
-        Initialize the process manager.
-        :param config: Configuration for the system command.
-        :param logger: Logger instance to use.
+        Initialize shell command process.
+        
+        Args:
+            config: Shell command configuration
+            logger: Logger for output streaming
         """
         self.config = config
         self.logger = logger
         self.process = None
         self.running = False
         self.pause_output_flag = False
-        # Store output for error detection
         self.stdout_lines = []
         self.stderr_lines = []
-        # Rich console for ANSI conversion
-        # self.console = Console()
 
     async def start(self) -> int:
-        """Start the system command process asynchronously and stream output."""
+        """
+        Start subprocess and stream output asynchronously.
+        
+        Returns:
+            Process return code
+        """
         try:
             self.process = await asyncio.create_subprocess_shell(
                 self.config.command,
@@ -73,15 +77,14 @@ class ShellCommandProcess:
 
     def _convert_ansi_to_rich_markup(self, text: str) -> str:
         """
-        Convert ANSI escape codes to Rich markup.
+        Convert ANSI escape codes to Rich markup format.
         
         Args:
-            text: Text containing ANSI escape codes
+            text: Text with ANSI escape codes
             
         Returns:
-            Text with Rich markup instead of ANSI codes
+            Text with Rich markup tags
         """
-        # ANSI color mapping to Rich markup
         ansi_to_rich = {
             '[0;30m': '[black]',      # Black
             '[0;31m': '[red]',        # Red
@@ -100,16 +103,14 @@ class ShellCommandProcess:
             '[1;36m': '[bold cyan]',  # Bold Cyan
             '[1;37m': '[bold white]', # Bold White
             '[0m': '[/]',             # Reset
-            '[1m': '[bold]',          # Bold
-            '[22m': '[/bold]',        # Reset bold
+            '[1m': '[bold]',
+            '[22m': '[/bold]',
         }
         
-        # Replace ANSI codes with Rich markup
         result = text
         for ansi_code, rich_markup in ansi_to_rich.items():
             result = result.replace(ansi_code, rich_markup)
         
-        # Handle any remaining ANSI codes with generic pattern
         ansi_pattern = re.compile(r'\x1b\[[0-9;]*[mK]')
         result = ansi_pattern.sub('', result)
         
@@ -117,9 +118,12 @@ class ShellCommandProcess:
 
     async def _read_stream(self, stream, output_list) -> None:
         """
-        Asynchronously read lines from a stream and send them to the output callback.
-        :param stream: The output stream (stdout or stderr).
-        :param output_list: List to store output lines for error detection.
+        Read stream lines asynchronously and log them.
+        Respects pause flag and converts ANSI codes to Rich markup.
+        
+        Args:
+            stream: Subprocess output stream (stdout or stderr)
+            output_list: List to accumulate output lines for error detection
         """
         while self.running and stream:
             if self.pause_output_flag:
@@ -129,13 +133,9 @@ class ShellCommandProcess:
             if not line:
                 break
             
-            # Decode line
             decoded_line = line.decode("utf-8").strip()
-            
-            # Store original for error detection
             output_list.append(decoded_line)
             
-            # Convert ANSI to Rich markup and log
             rich_line = self._convert_ansi_to_rich_markup(decoded_line)
             try:
                 self.logger.info(rich_line)
@@ -144,21 +144,15 @@ class ShellCommandProcess:
             
 
     def pause_output(self) -> None:
-        """
-        Pause streaming output to the output callback.
-        """
+        """Pause output streaming (output continues to be captured)."""
         self.pause_output_flag = True
 
     def resume_output(self) -> None:
-        """
-        Resume streaming output to the output callback.
-        """
+        """Resume output streaming."""
         self.pause_output_flag = False
 
     def terminate(self) -> None:
-        """
-        Terminate the running process and unregister the instance.
-        """
+        """Terminate running subprocess and unregister from instance registry."""
         if self.process and self.running:
             self.process.terminate()
             self.running = False
@@ -166,13 +160,20 @@ class ShellCommandProcess:
 
     def is_running(self) -> bool:
         """
-        Check if the process is still running.
-        :return: True if running, False otherwise.
+        Check if subprocess is still running.
+        
+        Returns:
+            True if process is active
         """
         return self.running and self.process and self.process.returncode is None
 
     async def run_end_wait(self) -> bool:
-        """Start and wait for completion, return True if successful."""
+        """
+        Start process and wait for completion with error detection.
+        
+        Returns:
+            True if successful (exit code 0 and no errors in output)
+        """
         try:
             return_code = await self.start()
 
@@ -180,7 +181,6 @@ class ShellCommandProcess:
                 self.logger.error(f"Process failed with return code: {return_code}")
                 return False
             
-            # Check for errors in output even if exit code is 0
             error_in_output, error_line = self._contains_error_in_output()
             if error_in_output:
                 self.logger.error(f"Process failed with error in output: '{error_line}'")
@@ -197,12 +197,11 @@ class ShellCommandProcess:
 
     def _contains_error_in_output(self) -> bool:
         """
-        Check if the process output contains error messages.
+        Check subprocess output for error patterns.
         
         Returns:
-            True if error messages were detected, False otherwise
+            Tuple of (error_found: bool, error_line: str or None)
         """
-        # Common error patterns for serial ports and system commands
         error_patterns = [
             r"could not open port",
             r"No such file or directory",
@@ -218,8 +217,6 @@ class ShellCommandProcess:
             r"bash:.*: No such file or directory"
         ]
         
-        
-        # Check both stdout and stderr for error patterns
         all_output = self.stdout_lines + self.stderr_lines
         
         for line in all_output:
@@ -232,17 +229,17 @@ class ShellCommandProcess:
 
     @classmethod
     def terminate_all(cls) -> None:
-        """
-        Terminate all running processes.
-        """
+        """Terminate all active ShellCommandProcess instances."""
         for proc in list(cls._instances):
             proc.terminate()
 
     @classmethod
     def get_running_processes(cls) -> list:
         """
-        Get a list of all currently running processes.
-        :return: List of running ShellCommandProcess instances.
+        Get list of all currently running processes.
+        
+        Returns:
+            List of active ShellCommandProcess instances
         """
         return [p for p in cls._instances if p.is_running()]
 

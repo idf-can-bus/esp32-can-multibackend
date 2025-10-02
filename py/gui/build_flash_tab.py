@@ -2,7 +2,9 @@
 __author__ = "Ivo Marvan"
 __email__ = "ivo@marvan.cz"
 __description__ = '''
-
+Build and flash tab for ESP32 Flash Tool GUI.
+Provides interface for selecting libraries, examples, and flashing firmware to multiple ESP32 ports.
+Includes real-time build output logging and dependency validation.
 '''
 from textual.app import App, ComposeResult
 from textual.containers import Grid
@@ -13,7 +15,11 @@ from py.app_logic import FlashApp
 from py.log.rich_log_handler import RichLogHandler
 
 class BuildFlashTab(Container):
-    """Tab with Build & Flash table, status log and toolbar."""
+    """
+    Build and flash operations tab.
+    Contains configuration table for library/example selection per port,
+    comprehensive build/flash log output, and toolbar with utility functions.
+    """
 
     def __init__(
             self, 
@@ -31,13 +37,11 @@ class BuildFlashTab(Container):
         self._debug = debug
 
     def _build_table(self) -> ComposeResult:
-        # headers
+        """Generate build/flash table with port selection controls."""
         yield Static("Port", classes="header")
         yield Static("Library", classes="header")
         yield Static("Example", classes="header")
         yield Static("Flash", classes="header")
-
-        # rows
         for port in self.ports:
             yield Static(port, classes="port")
 
@@ -55,11 +59,9 @@ class BuildFlashTab(Container):
             )
 
     def compose(self) -> ComposeResult:
-        # table
+        """Compose the tab layout with table, log viewer, and toolbar."""
         with Grid(id="table"):
             yield from self._build_table()
-
-        # log
         yield RichLogExtended(
             highlight=True,
             id="status",
@@ -69,8 +71,6 @@ class BuildFlashTab(Container):
             flush_interval=0.05,
             markup=True,
         )
-
-        # toolbar
         with Container(id="build-flash-actions"):
             yield Button("🧹 Clear Log", id="clear-log", classes="toolbar-button")
             if self._debug:
@@ -78,16 +78,12 @@ class BuildFlashTab(Container):
             yield Button("❌ Quit", id="quit", classes="toolbar-button")
 
     def on_mount(self) -> None:
-        # Connect the logging handler to RichLogExtended
+        """Initialize tab when mounted - connect logger and display configuration info."""
         RichLogHandler.set_rich_log(self.query_one(RichLogExtended))
-
-        # Log config file paths and loaded options on startup
         self.python_logger.info(f"Kconfig: {self.logic.kconfig_path}")
         self.python_logger.info(f"SDKconfig: {self.logic.sdkconfig_path}")
         self.python_logger.info(
             f"Loaded {len(self.logic.lib_options)} lib options, {len(self.logic.example_options)} example options")
-
-        # Debug: Print all loaded options
         self.python_logger.debug("=== LIB OPTIONS ===")
         for opt in self.logic.lib_options:
             self.python_logger.debug(f"  {opt.id}: {opt.display_name}")
@@ -97,14 +93,10 @@ class BuildFlashTab(Container):
             depends_str = f", depends_on: {opt.depends_on}" if opt.depends_on else ""
             self.python_logger.debug(f"  {opt.id}: {opt.display_name}{depends_str}")
 
-    # --- Event handlers --------------------------------------------------------
-
     def on_select_changed(self, event: Select.Changed) -> None:
-        # Find which row this select belongs to and update corresponding flash button
+        """Handle library/example selection changes and update flash button state based on dependencies."""
         grid = self.query_one("#table")
         all_selects = list(grid.query(Select))
-
-        # Find index of changed select
         select_index = -1
         for i, select in enumerate(all_selects):
             if select == event.select:
@@ -112,31 +104,20 @@ class BuildFlashTab(Container):
                 break
 
         if select_index >= 0:
-            # Calculate which row (each row has 2 selects: lib and example)
             row_index = select_index // 2
-
-            # Get both selects for this row
             lib_select = all_selects[row_index * 2]
             example_select = all_selects[row_index * 2 + 1]
-
-            # Get corresponding flash button - now we have 4 columns per row
             flash_buttons = [btn for btn in grid.query(Button) if btn.id and btn.id.startswith("flash-")]
             if row_index < len(flash_buttons):
                 flash_button = flash_buttons[row_index]
-
-                # Check if both selects have valid values
                 lib_selected = lib_select.value is not None and lib_select.value != Select.BLANK
                 example_selected = example_select.value is not None and example_select.value != Select.BLANK
-
-                # Check dependencies if both are selected
                 dependencies_ok = True
                 if lib_selected and example_selected:
                     dependencies_ok = self.logic.check_dependencies(lib_select.value, example_select.value)
 
-                    # Log dependency check for debugging
                     example_option = self.logic.get_example_option_by_id(example_select.value)
                     if example_option and example_option.depends_on:
-                        # old code: lib_option = self.logic.get_example_option_by_id(lib_select.value)
                         lib_option = self.logic.get_lib_option_by_id(lib_select.value)
                         msg_str = f"Dependency check: {example_select.value} requires {example_option.depends_on}, " \
                                   f"selected {lib_option.id if lib_option else 'unknown'} -> {'OK' if dependencies_ok else 'FAIL'}"
@@ -144,8 +125,6 @@ class BuildFlashTab(Container):
                             self.python_logger.debug(msg_str)
                         else:
                             self.python_logger.warning(msg_str)
-
-                # Button is enabled only when both are selected AND dependencies are satisfied
                 all_conditions_met = lib_selected and example_selected and dependencies_ok
                 flash_button.disabled = not all_conditions_met
 
@@ -160,20 +139,16 @@ class BuildFlashTab(Container):
             self._on_show_stats_pressed(event)
 
     def _on_flash_pressed(self, event: Button.Pressed) -> None:
+        """Handle flash button press - start async build and flash process."""
         port = event.button.id.replace("flash-", "")
-
-        # Find corresponding selects for this button
         grid = self.query_one("#table")
         buttons = [btn for btn in grid.query(Button) if btn.id and btn.id.startswith("flash-")]
 
         for i, btn in enumerate(buttons):
             if btn == event.button:
-                # 4 columns now: port, lib, example, flash
-                base_idx = 4 + i * 4 # Skip header row (5 items), then i rows of 5 columns each
-                lib_select = grid.children[base_idx + 1]  # lib is 2nd column (index 1)
-                example_select = grid.children[base_idx + 2]  # example is 3rd column (index 2)
-
-                # Execute flash sequence asynchronously to keep GUI responsive
+                base_idx = 4 + i * 4
+                lib_select = grid.children[base_idx + 1]
+                example_select = grid.children[base_idx + 2]
                 self.run_worker(
                     self.logic.config_compile_flash(port, lib_select.value, example_select.value),
                     name=f"flash_{port}"
@@ -189,8 +164,7 @@ class BuildFlashTab(Container):
         except Exception as e:
             self.python_logger.error(f"Failed to clear build log: {e}")
 
-    # For debugging purposes, add a button to show statistics
     def _on_show_stats_pressed(self, event: Button.Pressed) -> None:
-        """Show RichLogExtended statistics"""
+        """Display RichLogExtended performance statistics for debugging."""
         rich_log = self.query_one(RichLogExtended)
         rich_log.print_stats()

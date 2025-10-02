@@ -9,7 +9,7 @@ This project provides a modular, unified interface for CAN bus communication on 
 - Unified API for multiple CAN backends (TWAI, MCP2515 single/multi, Arduino)
 - Example applications for sending/receiving CAN messages (polling/interrupt)
 - Easy configuration via Kconfig (menuconfig)
-- Python-based flashing manager for multi-device workflows
+- Python-based flash manager with GUI for multi-device workflows
 
 ## Supported CAN Backends
 - **Built-in TWAI (SN65HVD230)** — ESP32's native CAN controller
@@ -42,22 +42,43 @@ idf.py -p /dev/ttyACM0 flash
 ```
 
 ### 2. Using Python Flash Manager
-For complex setups (multiple ESP32s, different CAN configs), use the Python tool `flash_manager.py` for a graphical and automated workflow:
+The `flash_manager.py` tool provides a comprehensive Textual-based GUI for managing ESP32 development workflows. It simplifies the entire build-flash-monitor cycle through an intuitive terminal interface, automatically detecting connected devices and handling ESP-IDF environment setup. Ideal for projects with multiple ESP32 boards requiring different configurations.
 
 ```sh
 python3 flash_manager.py
 ```
 
-- Select the port, CAN backend, and example for each connected ESP32.
-- The tool handles configuration, build, and flashing for each device.
+#### Building and Flashing with Flash Manager
+![Build and flash tab](doc/build_flash.png)
 
-![Flash Manager GUI](doc/uploader.png)
+The **Build & Flash** tab streamlines firmware deployment:
+- Auto-detects connected ESP32 devices (ttyACM*, ttyUSB*)
+- Select CAN backend (TWAI, MCP2515 single/multi) and example application per device
+- Validates configuration dependencies automatically
+- Manages isolated build workspaces for each lib/example combination
+- Displays real-time compilation output with color-coded logging
+- Handles complete workflow: configuration → build → flash in one click
+- Uses optimal parallel jobs based on available CPU and memory
+
+#### Monitoring Serial Ports
+![Monitor tab](doc/serial_monitors.png)
+
+The **Serial Monitors** tab enables real-time device monitoring:
+- Open multiple serial monitors simultaneously for connected devices
+- Real-time output streaming with configurable buffering
+- Start/Stop individual monitors without affecting others
+- Hide/Show monitor logs while keeping background logging active
+- Automatic port detection and fake ports for testing
+- Character-by-character or buffered output display
+- Supports monitoring alongside build operations
+
+
 
 ## Project Structure
 - `components/` — Modular CAN backends and dispatcher
 - `examples/` — Example applications
-- `main/` — Project entry, Kconfig
-- `py/` — Python utilities (flash_manager.py and logic)
+- `main/` — Project entry point and Kconfig configuration
+- `py/` — Python flash manager tool with GUI and backend logic
 - `doc/` — Documentation and wiring diagrams
 
 ## License
