@@ -43,10 +43,12 @@ class SerialMonitorsTab(Container):
         yield Static("Port", classes="header")
         yield Static("Open", classes="header")
         yield Static("Run", classes="header")
+        yield Static("Clear", classes="header")
         for port in self.ports:
             yield Static(port, classes="port-name")
             yield Button("+ Show", id=f"open-{port}", classes="open-button", disabled=False)
             yield Button("▶ Start", id=f"run-{port}", classes="run-button", disabled=False)
+            yield Button("🧹 Clear", id=f"clear-{port}", classes="clear-button", disabled=False)
 
     def compose(self) -> ComposeResult:
         with Container(id="serial-left-panel"):
@@ -62,6 +64,8 @@ class SerialMonitorsTab(Container):
             self._on_open_pressed(event)
         elif event.button.id and event.button.id.startswith("run-"):
             self._on_run_pressed(event)
+        elif event.button.id and event.button.id.startswith("clear-"):
+            self._on_clear_pressed(event)
         
     def _on_open_pressed(self, event: Button.Pressed) -> None:
         """Handle open/hide button toggle for port visibility"""
@@ -104,6 +108,21 @@ class SerialMonitorsTab(Container):
             # Run async stop in background
             self.app.run_worker(self._stop_monitoring(port), exclusive=False)
             self.python_logger.debug(f"Stop monitoring port {port}")
+
+    def _on_clear_pressed(self, event: Button.Pressed) -> None:
+        """Clear log content for the given port if the log exists."""
+        port = event.button.id.replace("clear-", "")
+        try:
+            if port in self.active_monitor_logs:
+                serial_logger = self.active_monitor_logs[port]
+                serial_logger.clear()
+                self.python_logger.info(f"Cleared log for port {port}")
+            else:
+                self.python_logger.warning(
+                    f"Cannot clear log for port {port} - no serial logger created yet"
+                )
+        except Exception as e:
+            self.python_logger.error(f"Failed to clear log for port {port}: {e}")
 
     def _add_monitor_log(self, port: str) -> None:
         """Show Log for monitoring port output (create if doesn't exist)"""
