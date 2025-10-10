@@ -1,6 +1,12 @@
 #include "driver/twai.h"
 #include "driver/gpio.h"
 #include "init_hardware.h"
+#include "mcp2515-esp32-idf/mcp2515.h"
+
+// Compile-time switch for SPI/link diagnostics in MCP2515 adapter
+#ifndef MCP2515_ADAPTER_DEBUG
+#define MCP2515_ADAPTER_DEBUG 0
+#endif
 
 void init_hardware(can_config_t *hw_config_ptr)
 {
@@ -41,8 +47,11 @@ void init_hardware(can_config_t *hw_config_ptr)
     static const gpio_num_t SCLK_GPIO = GPIO_NUM_36;  // SPI SCLK
     static const gpio_num_t CS_GPIO = GPIO_NUM_33;    // Chip Select
     static const gpio_num_t INT_GPIO = GPIO_NUM_34;   // Interrupt
-    static const uint32_t CAN_BAUDRATE = 1000000;     // 1 Mbps
+    static const CAN_SPEED_t CAN_BAUDRATE = CAN_1000KBPS;     // 1 Mbps
+    static const CAN_CLOCK_t CAN_CLOCK = MCP_16MHZ;
     static const spi_host_device_t SPI_HOST = SPI2_HOST;  // Explicitly define SPI host
+    static const bool USE_LOOPBACK = false;  // Use loopback mode for testing
+    static const bool ENABLE_DEBUG_SPI = (MCP2515_ADAPTER_DEBUG != 0);
 
     *hw_config_ptr = (can_config_t){
         .spi_bus = {
@@ -65,8 +74,11 @@ void init_hardware(can_config_t *hw_config_ptr)
             .dummy_bits = 0
         },
         .int_pin = INT_GPIO,
-        .baudrate = CAN_BAUDRATE,
-        .spi_host = SPI_HOST            // Add SPI host to config
+        .can_speed = CAN_BAUDRATE,
+        .can_clock = CAN_CLOCK,
+        .spi_host = SPI_HOST,            // Add SPI host to config
+        .use_loopback = USE_LOOPBACK,
+        .enable_debug_spi = ENABLE_DEBUG_SPI
     };
 
 #elif CONFIG_CAN_BACKEND_MCP2515_MULTI 
