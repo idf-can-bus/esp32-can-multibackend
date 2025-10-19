@@ -15,12 +15,34 @@ extern "C" {
 
 // for common tests
 #define TEST_MSG_ID ((uint8_t)1)
-typedef uint8_t unit48_big_endian_t[6];
+typedef uint8_t unit40_big_endian_t[5];
 
+// Flags API
+typedef enum {
+    TEST_FLAG_STATS_REQUEST = 1u << 0,
+    TEST_FLAG_RESERVED_1    = 1u << 1,
+    TEST_FLAG_RESERVED_2    = 1u << 2,
+    TEST_FLAG_RESERVED_3    = 1u << 3,
+} test_flag_bits_t;
+
+typedef struct {
+    uint8_t value;
+} test_flags_t;
+
+static inline void test_flags_set(test_flags_t *f, test_flag_bits_t bit) { f->value |= (uint8_t)bit; }
+static inline void test_flags_clear(test_flags_t *f, test_flag_bits_t bit) { f->value &= (uint8_t)~bit; }
+static inline bool test_flags_is_set(const test_flags_t *f, test_flag_bits_t bit) { return (f->value & (uint8_t)bit) != 0; }
+
+// Test frame payload layout (8 bytes total):
+//  byte0: sender_id
+//  byte1: heartbeat (uint8_t)
+//  byte2: flags (see test_flag_bits_t)
+//  byte3..7: timestamp40 (big-endian, 40-bit)
 typedef struct __attribute__((packed)) {
-    uint8_t sender_id; // 1. byte
-    uint8_t heartbeat; // 2. byte
-    unit48_big_endian_t timestamp; // 3. - 8. byte
+    uint8_t sender_id;          // 1. byte
+    uint8_t heartbeat;          // 2. byte
+    test_flags_t flags;         // 3. byte
+    unit40_big_endian_t timestamp40; // 4. - 8. byte
 } test_can_message_t;
 
 // other example of message access/definition
@@ -51,17 +73,24 @@ typedef union {
 } can_message_payload_t;
 
 // --- access to unit48_big_endian_t ------------------------------------------------------------
-// store 48 least significant bits of 64bit value into 6B array (big-endian)
-void store_timestamp48(uint64_t source, unit48_big_endian_t *target_ptr);
+// store 40 least significant bits of 64bit value into 5B array (big-endian)
+void store_timestamp40(uint64_t source, unit40_big_endian_t *target_ptr);
 
 
-// restore 6B big-endian timestamp back to 64bit value
-uint64_t restore_timestamp48(const unit48_big_endian_t *src_ptr);
+// restore 5B big-endian timestamp back to 64bit value
+uint64_t restore_timestamp40(const unit40_big_endian_t *src_ptr);
 
 // ------------------------------------------------------------------------------------------------
 
 // Generate new test message
 void fullfill_test_messages(uint8_t sender_id, uint8_t heartbeat, can_message_t *message);
+// Helpers to manipulate flags in prepared message
+static inline void set_test_flag(can_message_t *message, uint8_t flag)
+{
+    test_can_message_t *p = (test_can_message_t*)message->data;
+    test_flags_set(&p->flags, (test_flag_bits_t)flag);
+}
+
 
 // Print CAN message for debug purposes
 void print_can_message(const can_message_t *message);
@@ -74,30 +103,20 @@ uint8_t next_heartbeat(const uint8_t heartbeat);
 // process received message in a example 
 void process_received_message(can_message_t *message, const bool print_during_receive);
 
+// process received message from multiple senders (per-sender statistics and logging)
+void process_received_message_multi(can_message_t *message, const bool print_during_receive);
+
 // debug send message
 void debug_send_message(can_message_t *message, const bool print_during_send);
 
 // log message in a example 
 void log_message(const bool send, can_message_t *message, const bool print_details);
 
+// Derive default sender_id from device MAC: returns 0..255 
+uint8_t default_sender_id_from_mac(void);
+
 // Sleep for given milliseconds ensuring at least one RTOS tick is waited
 void sleep_ms_min_ticks(uint32_t ms);
-
-// --- enumerate senders ---------------------------------------------------------------------------
-typedef enum {
-    SENDER_ID_1 = 1,
-    SENDER_ID_2 = 2,
-    SENDER_ID_3 = 3,
-    SENDER_ID_4 = 4,
-    SENDER_ID_5 = 5,
-    SENDER_ID_6 = 6,
-    END_TAG_ID = 255,
-} sender_id_t;
-
-
-
-
-
 
 #ifdef __cplusplus
 }

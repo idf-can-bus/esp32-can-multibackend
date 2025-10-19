@@ -38,6 +38,7 @@
 #define RTR_MASK       0x40
 
 #define RXB0SIDH 0x61
+#define RXB0CTRL 0x60
 #define RXB0SIDL 0x62
 #define RXB0EID8 0x63
 #define RXB0EID0 0x64
@@ -45,6 +46,7 @@
 #define RXB0DATA 0x66
 
 #define RXB1SIDH 0x71
+#define RXB1CTRL 0x70
 #define RXB1SIDL 0x72
 #define RXB1EID8 0x73
 #define RXB1EID0 0x74
@@ -63,6 +65,9 @@
 #define TXB_MLOA  0x20
 #define TXB_TXERR 0x10
 #define TXB_TXREQ 0x08
+
+#define RXM_MASK  0x60
+#define RXB0_BUKT 0x04
 
 typedef struct MCP2515_Context {
     spi_device_handle_t spi;
@@ -194,6 +199,9 @@ ERROR_t MCP2515_CreateOnDevice(spi_device_handle_t spi,
     }
 
     if (mcp2515_ll_reset(ctx) != ERROR_OK) { MCP2515_Destroy(ctx); return ERROR_FAIL; }
+    // Accept all frames on both RX buffers, enable rollover on RXB0
+    mcp2515_ll_write(ctx, RXB0CTRL, RXM_MASK | RXB0_BUKT);
+    mcp2515_ll_write(ctx, RXB1CTRL, RXM_MASK);
     // Enable RX interrupts by default; ERRIF also useful for event wake
     mcp2515_ll_write(ctx, MCP_CANINTE, (1u<<0) | (1u<<1) | (1u<<5)); // RX0IF|RX1IF|ERRIF
     *out_handle = ctx;

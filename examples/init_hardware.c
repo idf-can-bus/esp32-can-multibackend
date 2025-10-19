@@ -90,6 +90,89 @@ void init_hardware(can_config_t *hw_config_ptr)
     };
 
 #elif CONFIG_CAN_BACKEND_MCP2515_MULTI 
+    // Two sub-modes: single-instance or three-instances on one SPI bus
+    // Select by example: single/* -> single-instance; multi/* -> three instances
+    #if CONFIG_EXAMPLE_RECV_INT_MULTI || CONFIG_EXAMPLE_RECV_POLL_MULTI || CONFIG_EXAMPLE_SEND_MULTI
+    ESP_LOGI("init_hardware", "Adapter: MCP2515_MULTI (three instances on one SPI)");
+    // Configure the first instance via can_config_t; the adapter init will be called with array later.
+    // For compatibility with canif_init(cfg) taking a single can_config_t, we will trigger adapter
+    // initialization for all three instances here and pass a dummy cfg to canif_init.
+    {
+        mcp_multi_instance_cfg_t instances[3] = {
+            {
+                .host = SPI2_HOST,
+                .bus_cfg = {
+                    .miso_io_num = GPIO_NUM_37,
+                    .mosi_io_num = GPIO_NUM_38,
+                    .sclk_io_num = GPIO_NUM_36,
+                    .quadwp_io_num = -1,
+                    .quadhd_io_num = -1,
+                },
+                .dev_cfg = {
+                    .mode = 0,
+                    .clock_speed_hz = 10000000,
+                    .spics_io_num = GPIO_NUM_33,   // CS A
+                    .queue_size = 64,
+                    .flags = 0,
+                    .command_bits = 0,
+                    .address_bits = 0,
+                    .dummy_bits = 0,
+                },
+                .int_gpio = GPIO_NUM_34,            // INT A
+                .can_speed = CAN_1000KBPS,
+                .can_clock = MCP_16MHZ,
+            },
+            {
+                .host = SPI2_HOST,
+                .bus_cfg = {
+                    .miso_io_num = GPIO_NUM_37,
+                    .mosi_io_num = GPIO_NUM_38,
+                    .sclk_io_num = GPIO_NUM_36,
+                    .quadwp_io_num = -1,
+                    .quadhd_io_num = -1,
+                },
+                .dev_cfg = {
+                    .mode = 0,
+                    .clock_speed_hz = 10000000,
+                    .spics_io_num = GPIO_NUM_35,   // CS B (inferred)
+                    .queue_size = 64,
+                    .flags = 0,
+                    .command_bits = 0,
+                    .address_bits = 0,
+                    .dummy_bits = 0,
+                },
+                .int_gpio = GPIO_NUM_39,            // INT B (inferred)
+                .can_speed = CAN_1000KBPS,
+                .can_clock = MCP_16MHZ,
+            },
+            {
+                .host = SPI2_HOST,
+                .bus_cfg = {
+                    .miso_io_num = GPIO_NUM_37,
+                    .mosi_io_num = GPIO_NUM_38,
+                    .sclk_io_num = GPIO_NUM_36,
+                    .quadwp_io_num = -1,
+                    .quadhd_io_num = -1,
+                },
+                .dev_cfg = {
+                    .mode = 0,
+                    .clock_speed_hz = 10000000,
+                    .spics_io_num = GPIO_NUM_40,   // CS C (inferred)
+                    .queue_size = 64,
+                    .flags = 0,
+                    .command_bits = 0,
+                    .address_bits = 0,
+                    .dummy_bits = 0,
+                },
+                .int_gpio = GPIO_NUM_12,            // INT C (inferred)
+                .can_speed = CAN_1000KBPS,
+                .can_clock = MCP_16MHZ,
+            },
+        };
+        (void)mcp2515_multi_init(instances, 3);
+        *hw_config_ptr = (can_config_t){0};
+    }
+    #else
     ESP_LOGI("init_hardware", "Adapter: MCP2515_MULTI (single-instance test)");
     // Prepare configuration for one instance; actual init is done in canif_init()
     *hw_config_ptr = (can_config_t){
@@ -115,7 +198,25 @@ void init_hardware(can_config_t *hw_config_ptr)
         .can_speed = CAN_1000KBPS,
         .can_clock = MCP_16MHZ,
     };
+    #endif
 #elif CONFIG_CAN_BACKEND_ARDUINO
     // init Arduino driver
+#endif
+}
+
+size_t can_configured_instance_count(void)
+{
+#if CONFIG_CAN_BACKEND_TWAI
+    return 1;
+#elif CONFIG_CAN_BACKEND_MCP2515_SINGLE
+    return 1;
+#elif CONFIG_CAN_BACKEND_MCP2515_MULTI
+    #if CONFIG_EXAMPLE_RECV_INT_MULTI || CONFIG_EXAMPLE_RECV_POLL_MULTI || CONFIG_EXAMPLE_SEND_MULTI
+    return 3; // three instances configured in this build profile
+    #else
+    return 1; // single-instance test
+    #endif
+#else
+    return 1;
 #endif
 }

@@ -26,15 +26,19 @@ void app_main(void)
     bool print_during_send = false;
     uint64_t index = 0;
     const uint64_t max_index = 2000;
-    sender_id_t sender_id = SENDER_ID_1;
+    uint8_t sender_id = default_sender_id_from_mac();
 
     // identify your self as sender
     ESP_LOGI(TAG, "Sender ID: %d", sender_id);
 
     while (1)
     {
-        // create message
+        // create message 
         fullfill_test_messages(sender_id, heartbeat, &message);
+        // Request statistics periodically
+        if ((index % max_index == 0) && (index != 0)) {
+            set_test_flag(&message, TEST_FLAG_STATS_REQUEST);
+        }
 
         // send it
         success = canif_send(&message);
@@ -52,8 +56,7 @@ void app_main(void)
         // next heartbeat
         heartbeat = next_heartbeat(heartbeat);
 
-        // Sometimes send extra tag for end of sequence
-        sender_id = (index % max_index == 0) ? END_TAG_ID : SENDER_ID_1;
+        // (tag is handled per-message via current_sender above)
 
         // wait for send interval
         sleep_ms_min_ticks(send_interval_ms);

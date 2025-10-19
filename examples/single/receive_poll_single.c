@@ -27,7 +27,7 @@ void app_main(void)
 
 
     // identify your self as receiver   
-    ESP_LOGI(TAG, "Receiver pool");
+    ESP_LOGI(TAG, "Receiver pool driven, MCP2515");
 
     while (1)
     {
