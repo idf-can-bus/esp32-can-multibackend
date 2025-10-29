@@ -9,22 +9,38 @@
 
 static const char* TAG = "can_backend_twai";
 
-// Remember TWAI configuration from can_twai_init
-static twai_config_t twai_config;
+// Remember TWAI configuration (split) from can_twai_init
+static twai_backend_config_t twai_config;
 
 // Initialize CAN hardware
-bool can_twai_init(const twai_config_t *cfg) 
+bool can_twai_init(const twai_backend_config_t *cfg)  
 {
     ESP_LOGD(TAG, "Initializing TWAI driver with:");
-    ESP_LOGD(TAG, "  TX GPIO: %d", (int)cfg->general_config.tx_io);
-    ESP_LOGD(TAG, "  RX GPIO: %d", (int)cfg->general_config.rx_io);
-    ESP_LOGD(TAG, "  Mode: %s", cfg->general_config.mode == TWAI_MODE_NORMAL ? "Normal" :
-                                 cfg->general_config.mode == TWAI_MODE_NO_ACK ? "No Ack" : "Listen Only");
+    ESP_LOGD(TAG, "  TX GPIO: %d", (int)cfg->wiring.tx_gpio);
+    ESP_LOGD(TAG, "  RX GPIO: %d", (int)cfg->wiring.rx_gpio);
+    ESP_LOGD(TAG, "  Mode: %s", cfg->params.mode == TWAI_MODE_NORMAL ? "Normal" :
+                                 cfg->params.mode == TWAI_MODE_NO_ACK ? "No Ack" : "Listen Only");
+
+    // Build general config from split config
+    twai_general_config_t g = {
+        .controller_id  = cfg->params.controller_id,
+        .mode           = cfg->params.mode,
+        .tx_io          = cfg->wiring.tx_gpio,
+        .rx_io          = cfg->wiring.rx_gpio,
+        .clkout_io      = cfg->wiring.clkout_io,
+        .bus_off_io     = cfg->wiring.bus_off_io,
+        .tx_queue_len   = cfg->params.tx_queue_len,
+        .rx_queue_len   = cfg->params.rx_queue_len,
+        .alerts_enabled = cfg->params.alerts_enabled,
+        .clkout_divider = cfg->params.clkout_divider,
+        .intr_flags     = cfg->params.intr_flags,
+        .general_flags  = {0},
+    };
 
     // Install TWAI driver with provided configuration
-    esp_err_t err = twai_driver_install(&cfg->general_config, 
-                                      &cfg->timing_config, 
-                                      &cfg->filter_config);
+    esp_err_t err = twai_driver_install(&g, 
+                                      &cfg->tf.timing, 
+                                      &cfg->tf.filter);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install TWAI driver: %s", esp_err_to_name(err));
         return false;
@@ -41,8 +57,8 @@ bool can_twai_init(const twai_config_t *cfg)
     twai_config = *cfg;
 
     ESP_LOGI(TAG, "TWAI started successfully (rx_timeout=%ldms, tx_timeout=%ldms)", 
-             pdTICKS_TO_MS(twai_config.receive_timeout), 
-             pdTICKS_TO_MS(twai_config.transmit_timeout));
+             pdTICKS_TO_MS(twai_config.timeouts.receive_timeout), 
+             pdTICKS_TO_MS(twai_config.timeouts.transmit_timeout));
 
     
     return true;
@@ -89,7 +105,7 @@ bool can_twai_send(const can_message_t *raw_out_msg)
     memcpy(msg.data, raw_out_msg->data, raw_out_msg->dlc);
 
     // Transmit message with configured timeout
-    esp_err_t err = twai_transmit(&msg, twai_config.transmit_timeout);
+    esp_err_t err = twai_transmit(&msg, twai_config.timeouts.transmit_timeout);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to send message: %s", esp_err_to_name(err));
         can_twai_reset_twai_if_needed();
@@ -110,11 +126,11 @@ void can_twai_reset_twai_if_needed(void) {
         if (status.state == TWAI_STATE_BUS_OFF) {
             ESP_LOGW(TAG, "Bus-off detected, initiating recovery...");
             twai_initiate_recovery();
-            vTaskDelay(twai_config.bus_off_timeout);  // wait for recovery
+            vTaskDelay(twai_config.timeouts.bus_off_timeout);  // wait for recovery
         } else if (status.state != TWAI_STATE_RUNNING) {
             ESP_LOGW(TAG, "Controller not running (state=%d), restarting...", (int)status.state);
             twai_stop();
-            vTaskDelay(twai_config.bus_not_running_timeout);
+            vTaskDelay(twai_config.timeouts.bus_not_running_timeout);
             twai_start();
         }
     }
@@ -130,7 +146,7 @@ bool can_twai_receive(can_message_t *raw_in_msg)
 
     // Receive message with configured timeout
     twai_message_t msg;
-    esp_err_t err = twai_receive(&msg, twai_config.receive_timeout);
+    esp_err_t err = twai_receive(&msg, twai_config.timeouts.receive_timeout);
     
     if (err == ESP_OK) {
         // Process received message

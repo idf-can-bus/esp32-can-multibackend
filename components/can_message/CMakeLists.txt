@@ -1,4 +1,4 @@
 idf_component_register(
-    SRCS "can_iface.c" 
+    SRCS "can_message.c" 
     INCLUDE_DIRS "."
 )

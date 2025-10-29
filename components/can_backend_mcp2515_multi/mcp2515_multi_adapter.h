@@ -1,5 +1,5 @@
 #pragma once
-#include "can_iface.h"
+#include "can_message.h"
 #include "mcp2515-esp32_multi/mcp2515_multi.h"
 
 #ifdef __cplusplus

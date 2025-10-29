@@ -1,7 +1,7 @@
-#include "can_dispatch.h"
 #include "esp_log.h"
 #include "examples_utils.h"
-#include "init_hardware.h"
+#include "can_dispatch.h"
+#include "hw_init_by_settings.h"
 
 static const char *TAG = "send_single";
 
@@ -9,12 +9,13 @@ static const char *TAG = "send_single";
 void app_main(void)
 {
 
-    // --- init hardware ----------------------------------------------------------------------------
-    can_config_t hw_config;
-    init_hardware(&hw_config);  // Refer to implementation for hardware initialization requirements
-
-    // --- common sender example part ---------------------------------------------------------------
-    canif_init(&hw_config);
+    // --- init hardware (header-only config) -------------------------------------------------------
+    // Configuration location:
+    // - This example expects a header-only HW config that defines HW_CFG and get_hw_config().
+    // - For TWAI backend: see examples/single/config_hw_twai.h
+    // - For MCP2515 backends (single/multi): analogous config headers (single/multi).
+    // - The same example source works for all backends; only the included config header differs.
+    init_hw();
 
     // --- global variables -------------------------------------------------------------------------
     can_message_t message;

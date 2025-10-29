@@ -21,5 +21,5 @@ endif()
 idf_component_register(
     SRCS ${APP_SRC}
     INCLUDE_DIRS "." "${EXAMPLES_DIR}"
-    REQUIRES can_dispatch examples_utils
+    REQUIRES can_dispatch examples_utils can_backend_twai
 )

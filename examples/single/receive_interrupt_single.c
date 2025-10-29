@@ -1,14 +1,13 @@
-#include "can_dispatch.h"
 #include "esp_log.h"
-#include "examples_utils.h"
-#include "init_hardware.h"
-#include "sdkconfig.h"
-#if CONFIG_CAN_BACKEND_TWAI
-#include "twai_adapter.h"
-#endif
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+
+#include "examples_utils.h"
+#include "can_dispatch.h"
+#include "hw_init_by_settings.h"
+
 
 /*
  * Example: receive_interrupt_single
@@ -90,12 +89,8 @@ static void can_rx_consumer_task(void *arg)
 void app_main(void)
 {
     
-    // --- init hardware ----------------------------------------------------------------------------
-    can_config_t hw_config;
-    init_hardware(&hw_config);  // Refer to implementation for hardware initialization requirements
-
-    // --- common init ------------------------------------------------------------------------------
-    canif_init(&hw_config);
+    // --- init hardware (header-only config) -------------------------------------------------------
+    init_hw();
 
     // --- create RX queue --------------------------------------------------------------------------
     rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(can_message_t));

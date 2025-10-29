@@ -13,7 +13,7 @@ set(submodule_includes
 idf_component_register(
   SRCS ${local_srcs} ${submodule_srcs}
   INCLUDE_DIRS ${local_includes} ${submodule_includes}
-  PRIV_REQUIRES can_iface driver
+  PRIV_REQUIRES can_message driver
 )
 
 # Exclude if not selected in menuconfig

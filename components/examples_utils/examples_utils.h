@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "can_iface.h"
+#include "can_message.h"
 
 #ifdef __cplusplus
 extern "C" {

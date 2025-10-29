@@ -1,7 +1,7 @@
 idf_component_register(
-    SRCS "twai_adapter.c"
+    SRCS "twai_adapter.c" 
     INCLUDE_DIRS "."
-    REQUIRES can_iface driver
+    REQUIRES can_message driver
 )
 
 # compile only if TWAI is selected in menuconfig

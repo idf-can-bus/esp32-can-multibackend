@@ -4,7 +4,6 @@
 #include "mcp2515_multi_adapter.h"
 #endif
 
-
 // Initialize CAN hardware
 bool canif_init(const can_config_t *cfg)
 {

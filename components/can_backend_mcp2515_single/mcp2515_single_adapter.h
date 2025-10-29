@@ -1,5 +1,5 @@
 #pragma once
-#include "can_iface.h"
+#include "can_message.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "mcp2515-esp32-idf/mcp2515.h"

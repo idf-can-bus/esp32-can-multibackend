@@ -1,26 +1,19 @@
 #pragma once
-#include "can_iface.h"
+#include "can_message.h"
 #include "driver/twai.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "twai_config_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct {
-    twai_general_config_t general_config;  // General TWAI configuration
-    twai_timing_config_t timing_config;    // Timing configuration (baudrate)
-    twai_filter_config_t filter_config;    // Message filter configuration
-    TickType_t receive_timeout;            // Timeout for receiving messages
-    TickType_t transmit_timeout;           // Timeout for transmitting messages  
-    TickType_t bus_off_timeout;            // Timeout for bus-off recovery
-    TickType_t bus_not_running_timeout;    // Timeout for bus-not-running recovery
-} twai_config_t;
+
 
 
 // Initialize CAN hardware
-bool can_twai_init(const twai_config_t *cfg);
+bool can_twai_init(const twai_backend_config_t *cfg);
 
 // Deinitialize CAN hardware
 bool can_twai_deinit();
