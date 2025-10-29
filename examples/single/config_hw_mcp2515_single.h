@@ -3,10 +3,10 @@
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "mcp2515-esp32-idf/mcp2515.h"
-#include "components/can_backend_mcp2515_multi/mcp2515_config_types.h"
+#include "mcp2515_config_types.h"
 
 // Single definition: bundle with one device (unified MCP2515 config types)
-static const mcp2515_bundle_config_t BUS_CFG = {
+const mcp2515_bundle_config_t CAN_HW_CFG = {
     .bus = {
         .wiring = {
             .miso_io_num = GPIO_NUM_37,

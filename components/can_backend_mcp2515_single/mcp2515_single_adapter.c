@@ -117,9 +117,7 @@ bool mcp2515_single_init(const mcp2515_bundle_config_t *cfg) {
     const mcp2515_device_config_t *dev0 = &s_bundle->devices[0];
 
     #if MCP2515_ADAPTER_DEBUG
-    if (mcp2515_config.enable_debug_spi) {
-        test_gpio_configuration((const mcp2515_single_config_t*)&mcp2515_config);
-    }
+        // test_gpio_cs(dev0->wiring.cs_gpio);
     #endif
     
     // Step 1: Initialize MCP2515 chip structure
@@ -154,7 +152,9 @@ if (err != ESP_OK) {
     }
     
     // Step 3: Add MCP2515 device to SPI bus
-    err = spi_bus_add_device(mcp2515_config.spi_host, &mcp2515_config.spi_dev, &MCP2515_Object->spi);
+    spi_device_interface_config_t idf_dev_cfg = {0};
+    mcp_spi_dev_to_idf(&dev0->wiring, &dev0->spi_params, &idf_dev_cfg);
+    err = spi_bus_add_device(host, &idf_dev_cfg, &MCP2515_Object->spi);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add MCP2515 device to SPI bus: %s", esp_err_to_name(err));
         return false;
@@ -168,8 +168,8 @@ if (err != ESP_OK) {
     }
     
     // Step 5: Set bitrate
-    ESP_LOGI(TAG, "Setting bitrate: speed=%d, clock=%d", mcp2515_config.can_speed, mcp2515_config.can_clock);
-    ret = MCP2515_setBitrate(mcp2515_config.can_speed, mcp2515_config.can_clock);
+    ESP_LOGI(TAG, "Setting bitrate: speed=%d, clock=%d", dev0->can.can_speed, dev0->hw.crystal_frequency);
+    ret = MCP2515_setBitrate(dev0->can.can_speed, dev0->hw.crystal_frequency);
     if (ret != ERROR_OK) {
         ESP_LOGE(TAG, "Failed to set bitrate: %d", ret);
         return false;
@@ -189,7 +189,7 @@ if (err != ESP_OK) {
     const char* mode_name;
     #endif
 
-    if (mcp2515_config.use_loopback) {
+    if (dev0->can.use_loopback) {
         target_mode = CANCTRL_REQOP_LOOPBACK;
         #if MCP2515_ADAPTER_DEBUG
         mode_name = "loopback";

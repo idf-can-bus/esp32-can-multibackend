@@ -3,9 +3,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "sdkconfig.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
-#include "components/can_backend_mcp2515_single/mcp2515-esp32-idf/mcp2515.h"
+
+// Bring in CAN_CLOCK_t and CAN_SPEED_t from the active backend's MCP2515 library
+#if defined(CONFIG_CAN_BACKEND_MCP2515_SINGLE)
+#include "../can_backend_mcp2515_single/mcp2515-esp32-idf/mcp2515.h"
+#elif defined(CONFIG_CAN_BACKEND_MCP2515_MULTI)
+#include "mcp2515-esp32_multi/mcp2515_multi.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {

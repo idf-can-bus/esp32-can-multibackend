@@ -9,11 +9,11 @@
 #include "twai_adapter.h"
 #elif CONFIG_CAN_BACKEND_MCP2515_SINGLE
 // Use unified MCP2515 config types for all MCP2515 variants
-#include "components/can_backend_mcp2515_multi/mcp2515_config_types.h"
+#include "mcp2515_config_types.h"
 #include "mcp2515_single_adapter.h"
 #elif CONFIG_CAN_BACKEND_MCP2515_MULTI
 // Use unified MCP2515 config types for all MCP2515 variants
-#include "components/can_backend_mcp2515_multi/mcp2515_config_types.h"
+#include "mcp2515_config_types.h"
 #include "mcp2515_multi_adapter.h"
 #elif CONFIG_CAN_BACKEND_ARDUINO
 #include "can_backend_arduino.h"

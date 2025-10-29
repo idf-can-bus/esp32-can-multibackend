@@ -13,6 +13,7 @@ set(submodule_includes
 idf_component_register(
   SRCS ${local_srcs} ${submodule_srcs}
   INCLUDE_DIRS ${local_includes} ${submodule_includes}
+  REQUIRES can_backend_mcp2515_multi
   PRIV_REQUIRES can_message driver
 )
 

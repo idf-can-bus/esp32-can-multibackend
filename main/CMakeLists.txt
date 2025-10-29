@@ -1,9 +1,7 @@
 set(EXAMPLES_DIR ${CMAKE_SOURCE_DIR}/examples)
 
-# Vždy registrovat 'main' – bez app_main
-set(APP_SRC "${EXAMPLES_DIR}/init_hardware.c")
 
-# Podle Kconfig přidat vybraný příklad (ten definuje app_main)
+# By Kconfig select the example to build
 if(CONFIG_EXAMPLE_SEND_SINGLE)
     list(APPEND APP_SRC "${EXAMPLES_DIR}/single/send_single.c")
 elseif(CONFIG_EXAMPLE_RECV_POLL_SINGLE)
