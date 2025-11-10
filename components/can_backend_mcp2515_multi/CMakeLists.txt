@@ -1,12 +1,13 @@
 set(MULTI_SRC
   mcp2515_multi_adapter.c
+  mcp2515-esp32_multi/mcp2515_multi_if.c
   mcp2515-esp32_multi/mcp2515_multi.c
 )
 
 idf_component_register(
   SRCS ${MULTI_SRC}
   INCLUDE_DIRS "." "mcp2515-esp32_multi"
-  PRIV_REQUIRES can_message driver freertos esp_timer
+  REQUIRES driver freertos esp_timer
 )
 
 if(NOT CONFIG_CAN_BACKEND_MCP2515_MULTI)

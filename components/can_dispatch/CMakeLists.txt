@@ -1,5 +1,14 @@
+set(REQUIRES_DEPS)
+list(APPEND REQUIRES_DEPS can_backend_mcp2515_multi)
+if(CONFIG_CAN_BACKEND_TWAI)
+    list(APPEND REQUIRES_DEPS can_backend_twai)
+endif()
+if(CONFIG_CAN_BACKEND_MCP2515_SINGLE)
+    list(APPEND REQUIRES_DEPS can_backend_mcp2515_single)
+endif()
+
 idf_component_register(
     SRCS "can_dispatch.c"
     INCLUDE_DIRS "."
-    REQUIRES can_message can_backend_twai can_backend_mcp2515_single can_backend_mcp2515_multi
+    REQUIRES ${REQUIRES_DEPS}
 )

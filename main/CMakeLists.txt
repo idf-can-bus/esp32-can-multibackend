@@ -29,10 +29,9 @@ if(CONFIG_CAN_BACKEND_MCP2515_SINGLE)
     list(APPEND REQUIRES_DEPS can_backend_mcp2515_multi)
 endif()
 
-# (optional) future: multi-backend
-# if(CONFIG_CAN_BACKEND_MCP2515_MULTI)
-#     list(APPEND REQUIRES_DEPS can_backend_mcp2515_multi)
-# endif()
+if(CONFIG_CAN_BACKEND_MCP2515_MULTI)
+    list(APPEND REQUIRES_DEPS can_backend_mcp2515_multi)
+endif()
 
 idf_component_register(
     SRCS ${APP_SRC}

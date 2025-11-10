@@ -1,8 +1,9 @@
-#include "mcp2515_multi_adapter.h"
+#include "can_dispatch.h"
+#include "mcp2515_multi_if.h"
 #include <stdio.h>
 #include "esp_log.h"
 #include "examples_utils.h"
-#include "init_hardware.h"
+#include "../hw_init_by_settings.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -33,11 +34,13 @@ static void can_rx_producer_task(void *arg)
 {
     producer_arg_t *parg = (producer_arg_t *)arg;
     const size_t idx = parg->index;
+    can_bus_handle_t bus = canif_bus_default();
+    can_dev_handle_t dev = canif_device_at(bus, idx);
     can_message_t message;
     for (;;) {
         // Drain all available frames from this instance
         bool any = false;
-        while (mcp2515_multi_receive(idx, &message)) {
+        while (canif_receive_from(dev, &message)) {
             (void)xQueueSend(rx_queue, &message, 0);
             any = true;
         }

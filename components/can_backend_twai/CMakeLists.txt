@@ -1,7 +1,7 @@
 idf_component_register(
     SRCS "twai_adapter.c" 
     INCLUDE_DIRS "."
-    REQUIRES can_message driver
+    REQUIRES  driver can_backend_mcp2515_multi
 )
 
 # compile only if TWAI is selected in menuconfig

@@ -1,3 +1,8 @@
+# Only build this component when the MCP2515_SINGLE backend is enabled
+if(NOT CONFIG_CAN_BACKEND_MCP2515_SINGLE)
+    return()
+endif()
+
 # local adapter
 set(local_srcs "mcp2515_single_adapter.c")
 set(local_includes ".")
@@ -14,10 +19,5 @@ idf_component_register(
   SRCS ${local_srcs} ${submodule_srcs}
   INCLUDE_DIRS ${local_includes} ${submodule_includes}
   REQUIRES can_backend_mcp2515_multi
-  PRIV_REQUIRES can_message driver
+  PRIV_REQUIRES driver
 )
-
-# Exclude if not selected in menuconfig
-if(NOT CONFIG_CAN_BACKEND_MCP2515_SINGLE)
-  set_property(TARGET ${COMPONENT_LIB} PROPERTY EXCLUDE_FROM_ALL 1)
-endif()

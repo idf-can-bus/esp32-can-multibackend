@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
-#include "can_message.h"
+#include "mcp2515-esp32_multi/can_message.h"
 
 #include "sdkconfig.h"
 #if CONFIG_CAN_BACKEND_TWAI
@@ -9,12 +9,11 @@
 #include "twai_adapter.h"
 #elif CONFIG_CAN_BACKEND_MCP2515_SINGLE
 // Use unified MCP2515 config types for all MCP2515 variants
-#include "mcp2515_config_types.h"
+#include "mcp2515_multi_if.h"
 #include "mcp2515_single_adapter.h"
 #elif CONFIG_CAN_BACKEND_MCP2515_MULTI
-// Use unified MCP2515 config types for all MCP2515 variants
-#include "mcp2515_config_types.h"
-#include "mcp2515_multi_adapter.h"
+// Multi MCP2515 backend interface (bus/dev registry + messaging)
+#include "mcp2515_multi_if.h"
 #elif CONFIG_CAN_BACKEND_ARDUINO
 #include "can_backend_arduino.h"
 #endif

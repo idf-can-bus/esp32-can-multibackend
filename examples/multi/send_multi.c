@@ -1,7 +1,8 @@
-#include "mcp2515_multi_adapter.h"
+#include "can_dispatch.h"
+#include "mcp2515_multi_if.h"
 #include "esp_log.h"
 #include "examples_utils.h"
-#include "init_hardware.h"
+#include "../hw_init_by_settings.h"
 
 /*
  * Example: send_multi
@@ -12,14 +13,14 @@ static const char *TAG = "send_multi";
 
 void app_main(void)
 {
-    // Init hardware & CAN system (explicit config)
-    static can_config_t cfg;
-    init_hardware(&cfg);
+    // Initialize hardware via header-only configuration and can_dispatch
+    init_hw();
 
     const uint32_t send_interval_ms = 10;
 
-    // Query number of instances configured by init_hardware()
-    size_t n = can_configured_instance_count();
+    // Query number of devices on default bus
+    can_bus_handle_t bus = canif_bus_default();
+    size_t n = canif_bus_device_count(bus);
 
     // Size arrays dynamically by number of instances
     uint8_t heartbeat[n];
@@ -42,7 +43,8 @@ void app_main(void)
             if ((index % stats_every == 0) && (index != 0)) {
                 set_test_flag(&msg, TEST_FLAG_STATS_REQUEST);
             }
-            bool ok = mcp2515_multi_send(i, &msg);
+            can_dev_handle_t dev = canif_device_at(bus, i);
+            bool ok = canif_send_to(dev, &msg);
             if (!ok) {
                 ESP_LOGE(TAG, "TX%u: send failed", (unsigned)i);
                 print_can_message(&msg);
