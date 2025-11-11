@@ -1,8 +1,7 @@
-#include "can_dispatch.h"
-#include "mcp2515_multi_if.h"
+#include "mcp2515_multi.h"
 #include "esp_log.h"
 #include "examples_utils.h"
-#include "../hw_init_by_settings.h"
+#include "config_hw_mcp2515_multi_send.h"
 
 /*
  * Example: send_multi
@@ -13,8 +12,8 @@ static const char *TAG = "send_multi";
 
 void app_main(void)
 {
-    // Initialize hardware via header-only configuration and can_dispatch
-    init_hw();
+    // Initialize MCP2515 multi library directly with bundle config, see config_hw_mcp2515_multi_send.h
+    (void)canif_multi_init_default(&CAN_HW_CFG);
 
     const uint32_t send_interval_ms = 10;
 

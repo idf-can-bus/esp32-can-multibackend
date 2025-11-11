@@ -227,6 +227,7 @@ typedef struct {
     uint64_t seq_start_time_us;
     uint8_t  expected_heartbeat;
     char     dot_char; // visualization char assigned to this sender
+    uint64_t print_count; // per-sender print throttling
 } sender_stats_t;
 
 #define MAX_SENDERS_TRACKED 10
@@ -277,6 +278,7 @@ void process_received_message_multi(can_message_t *message, const bool print_dur
         sender_stats[sid].seq_start_time_us = 0;
         sender_stats[sid].expected_heartbeat = 0;
         sender_stats[sid].dot_char = next_dot_char_for_sender(sid);
+        sender_stats[sid].print_count = 0;
         sender_seen[sid] = true;
     }
 
@@ -285,8 +287,9 @@ void process_received_message_multi(can_message_t *message, const bool print_dur
     if (print_during_receive) {
         print_can_message(message);
     } else {
-        // compact log: print per-sender char instead of dot
-        if (count_of_messages_for_log % PRINT_DOT_EVERY_N_MESSAGES == 0) {
+        // compact log: per-sender throttled printing to visualize concurrent senders
+        st->print_count++;
+        if (st->print_count % PRINT_DOT_EVERY_N_MESSAGES == 0) {
             printf("%c", st->dot_char);
         }
         if (count_of_messages_for_log % PRINT_NL_EVERY_N_MESSAGES == 0) {

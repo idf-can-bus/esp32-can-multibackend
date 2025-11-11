@@ -1,16 +1,15 @@
-#include "can_dispatch.h"
-#include "mcp2515_multi_if.h"
+#include "mcp2515_multi.h"
 #include <stdio.h>
 #include "examples_utils.h"
-#include "../hw_init_by_settings.h"
+#include "config_hw_mcp2515_multi_receive.h"
 #include "esp_log.h"
 
 static const char *TAG = "receive_poll_multi";
 
 void app_main(void)
 {
-    // Initialize hardware via header-only configuration and can_dispatch
-    init_hw();
+    // Initialize MCP2515 multi library directly with bundle config, see config_hw_mcp2515_multi_receive.h
+    (void)canif_multi_init_default(&CAN_HW_CFG);
 
     const uint32_t receive_interval_ms = 1;
     can_message_t msg;

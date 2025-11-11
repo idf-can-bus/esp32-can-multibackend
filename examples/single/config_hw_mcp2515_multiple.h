@@ -2,7 +2,7 @@
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
-#include "mcp2515_multi_if.h"
+#include "mcp2515_multi.h"
 
 // Single-device configuration for the multi MCP2515 backend (one bus, one device)
 // This header defines a single constant used by examples via can_dispatch.

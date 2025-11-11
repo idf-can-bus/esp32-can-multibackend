@@ -2,7 +2,7 @@
 #include "can_message.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
-#include "mcp2515_multi_if.h"
+#include "mcp2515_multi.h"
 
 #ifdef __cplusplus
 extern "C" {

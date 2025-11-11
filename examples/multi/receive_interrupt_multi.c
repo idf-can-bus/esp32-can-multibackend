@@ -1,9 +1,8 @@
-#include "can_dispatch.h"
-#include "mcp2515_multi_if.h"
+#include "mcp2515_multi.h"
 #include <stdio.h>
 #include "esp_log.h"
 #include "examples_utils.h"
-#include "../hw_init_by_settings.h"
+#include "config_hw_mcp2515_multi_receive.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -64,9 +63,8 @@ static void can_rx_consumer_task(void *arg)
 
 void app_main(void)
 {
-    // Hardware init prepares SPI and creates three MCP2515 instances via adapter
-    can_config_t dummy_cfg; // unused in this path
-    init_hardware(&dummy_cfg);
+    // Initialize MCP2515 multi library directly with bundle config, see config_hw_mcp2515_multi_receive.h
+    (void)canif_multi_init_default(&CAN_HW_CFG);
 
     rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(can_message_t));
     if (!rx_queue) {
@@ -76,7 +74,8 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Receiver interrupt-driven");
 
-    size_t n = can_configured_instance_count();
+    can_bus_handle_t bus = canif_bus_default();
+    size_t n = canif_bus_device_count(bus);
     // Create one producer per instance
     for (size_t i=0; i<n; ++i) {
         producer_arg_t *parg = (producer_arg_t*)pvPortMalloc(sizeof(producer_arg_t));

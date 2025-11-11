@@ -1,7 +1,7 @@
 set(MULTI_SRC
   mcp2515_multi_adapter.c
-  mcp2515-esp32_multi/mcp2515_multi_if.c
   mcp2515-esp32_multi/mcp2515_multi.c
+  mcp2515-esp32_multi/mcp2515_multi_internal.c
 )
 
 idf_component_register(

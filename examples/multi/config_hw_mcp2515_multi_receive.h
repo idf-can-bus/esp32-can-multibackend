@@ -2,7 +2,7 @@
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
-#include "mcp2515_multi_if.h"
+#include "mcp2515_multi.h"
 
 // Multi-device configuration for receive_*_multi examples:
 // Three MCP2515 devices on SPI2 host, each with its own INT line.

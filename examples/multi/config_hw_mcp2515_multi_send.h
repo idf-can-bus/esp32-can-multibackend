@@ -2,7 +2,7 @@
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
-#include "mcp2515_multi_if.h"
+#include "mcp2515_multi.h"
 
 // Multi-device configuration for send_multi example:
 // Two MCP2515 devices on SPI3 host, no INT lines (TX only)

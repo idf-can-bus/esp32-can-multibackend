@@ -1,7 +1,7 @@
 #include "can_dispatch.h"
 #include "sdkconfig.h"
 #if CONFIG_CAN_BACKEND_MCP2515_MULTI
-#include "mcp2515_multi_if.h"
+#include "mcp2515_multi.h"
 #endif
 
 // Initialize CAN hardware
