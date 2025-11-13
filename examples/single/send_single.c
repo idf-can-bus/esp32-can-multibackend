@@ -18,7 +18,7 @@ void app_main(void)
     init_hw();
 
     // --- global variables -------------------------------------------------------------------------
-    can_message_t message;
+    twai_message_t message;
     uint8_t heartbeat = 0;
     bool success = false;
 

@@ -12,7 +12,7 @@ void app_main(void)
     (void)canif_multi_init_default(&CAN_HW_CFG);
 
     const uint32_t receive_interval_ms = 1;
-    can_message_t msg;
+    twai_message_t msg;
 
     can_bus_handle_t bus = canif_bus_default();
     size_t n = canif_bus_device_count(bus);

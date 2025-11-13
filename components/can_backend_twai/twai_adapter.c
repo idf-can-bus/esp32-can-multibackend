@@ -85,33 +85,22 @@ bool can_twai_deinit()
 }
 
 
-bool can_twai_send(const can_message_t *raw_out_msg)
+bool can_twai_send(const twai_message_t *msg)
 {
     // Validate message length
-    if (raw_out_msg->dlc > TWAI_FRAME_MAX_DLC) {
-        ESP_LOGE(TAG, "Invalid message length: %d", raw_out_msg->dlc);
+    if (msg->data_length_code > TWAI_FRAME_MAX_DLC) {
+        ESP_LOGE(TAG, "Invalid message length: %d", msg->data_length_code);
         return false;
     }
 
-    // Prepare TWAI message
-    twai_message_t msg = {
-        .flags = 0,
-        .identifier = raw_out_msg->id,
-        .data_length_code = raw_out_msg->dlc,
-        .data = {0}
-    };
-       
-    // Copy raw_out_msg->data to message
-    memcpy(msg.data, raw_out_msg->data, raw_out_msg->dlc);
-
     // Transmit message with configured timeout
-    esp_err_t err = twai_transmit(&msg, twai_config.timeouts.transmit_timeout);
+    esp_err_t err = twai_transmit(msg, twai_config.timeouts.transmit_timeout);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to send message: %s", esp_err_to_name(err));
         can_twai_reset_twai_if_needed();
         return false;
     }
-    ESP_LOGD(TAG, "Message sent: ID=0x%lX", raw_out_msg->id);
+    ESP_LOGD(TAG, "Message sent: ID=0x%lX", msg->identifier);
     return true;
 }
 
@@ -136,33 +125,29 @@ void can_twai_reset_twai_if_needed(void) {
     }
 } // can_twai_reset_twai_if_needed
 
-bool can_twai_receive(can_message_t *raw_in_msg)
+bool can_twai_receive(twai_message_t *msg)
 {
     // Validate input buffer
-    if (raw_in_msg == NULL) {
+    if (msg == NULL) {
         ESP_LOGE(TAG, "Invalid input buffer");
         return false;
     }
 
     // Receive message with configured timeout
-    twai_message_t msg;
-    esp_err_t err = twai_receive(&msg, twai_config.timeouts.receive_timeout);
+    esp_err_t err = twai_receive(msg, twai_config.timeouts.receive_timeout);
     
     if (err == ESP_OK) {
-        // Process received message
-        raw_in_msg->id = msg.identifier;
-        raw_in_msg->dlc = msg.data_length_code;
-        if (msg.data_length_code <= TWAI_FRAME_MAX_DLC) {
-            memcpy(raw_in_msg->data, msg.data, msg.data_length_code);
-            ESP_LOGD(TAG, "Received ID=0x%lX LEN=%d", msg.identifier, msg.data_length_code);
+        // Validate received message
+        if (msg->data_length_code <= TWAI_FRAME_MAX_DLC) {
+            ESP_LOGD(TAG, "Received ID=0x%lX LEN=%d", msg->identifier, msg->data_length_code);
+            return true;
         } else {
-            ESP_LOGW(TAG, "Received message with invalid DLC: %d", msg.data_length_code);
+            ESP_LOGW(TAG, "Received message with invalid DLC: %d", msg->data_length_code);
             return false;
         }
-        return true;
     } else if (err != ESP_ERR_TIMEOUT) {
         // Log only real errors, timeout is expected
-       ESP_LOGE(TAG, "Error receiving message: %s (error code: %d)", 
+        ESP_LOGE(TAG, "Error receiving message: %s (error code: %d)", 
                  esp_err_to_name(err), err);
         can_twai_reset_twai_if_needed();
         return false;

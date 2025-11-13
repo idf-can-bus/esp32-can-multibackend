@@ -1,5 +1,5 @@
 #pragma once
-#include "can_message.h"
+#include "driver/twai.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "mcp2515_multi.h"
@@ -16,10 +16,10 @@ bool mcp2515_single_init(const mcp2515_bundle_config_t *cfg);
 bool mcp2515_single_deinit();
 
 // Send message
-bool mcp2515_single_send(const can_message_t *raw_out_msg);
+bool mcp2515_single_send(const twai_message_t *msg);
 
 // Receive message
-bool mcp2515_single_receive(can_message_t *raw_in_msg);
+bool mcp2515_single_receive(twai_message_t *msg);
 
 #ifdef __cplusplus
 }

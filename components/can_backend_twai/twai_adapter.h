@@ -1,5 +1,4 @@
 #pragma once
-#include "can_message.h"
 #include "driver/twai.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -19,10 +18,10 @@ bool can_twai_init(const twai_backend_config_t *cfg);
 bool can_twai_deinit();
 
 // non-blocking send
-bool can_twai_send(const can_message_t *raw_out_msg);
+bool can_twai_send(const twai_message_t *msg);
 
 // non-blocking receive
-bool can_twai_receive(can_message_t *raw_in_msg);
+bool can_twai_receive(twai_message_t *msg);
 
 /**
  * Checks TWAI controller status and resets it if necessary.

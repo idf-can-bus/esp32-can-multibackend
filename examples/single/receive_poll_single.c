@@ -15,7 +15,7 @@ void app_main(void)
     init_hw();
 
     // --- global variables -------------------------------------------------------------------------
-    can_message_t message;
+    twai_message_t message;
     bool success = false;
 
     // --- example settings ------------------------------------------------------------------------

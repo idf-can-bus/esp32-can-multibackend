@@ -1,6 +1,6 @@
 #pragma once
-#include "can_message.h"
-#include "mcp2515-esp32_multi/mcp2515_multi_internal.h"
+#include "driver/twai.h"
+#include "mcp2515_multi_internal.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,8 +22,8 @@ bool mcp2515_multi_init(const mcp_multi_instance_cfg_t* instances, size_t count)
 bool mcp2515_multi_deinit(void);
 
 // Index-based send/receive to a specific instance
-bool mcp2515_multi_send(size_t index, const can_message_t* raw_out_msg);
-bool mcp2515_multi_receive(size_t index, can_message_t* raw_in_msg);
+bool mcp2515_multi_send(size_t index, const twai_message_t* msg);
+bool mcp2515_multi_receive(size_t index, twai_message_t* msg);
 
 #ifdef __cplusplus
 }

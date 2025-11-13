@@ -35,7 +35,7 @@ static void can_rx_producer_task(void *arg)
     const size_t idx = parg->index;
     can_bus_handle_t bus = canif_bus_default();
     can_dev_handle_t dev = canif_device_at(bus, idx);
-    can_message_t message;
+    twai_message_t message;
     for (;;) {
         // Drain all available frames from this instance
         bool any = false;
@@ -52,7 +52,7 @@ static void can_rx_producer_task(void *arg)
 static void can_rx_consumer_task(void *arg)
 {
     (void)arg;
-    can_message_t message;
+    twai_message_t message;
     const bool print_during_receive = false;
     for (;;) {
         if (xQueueReceive(rx_queue, &message, portMAX_DELAY) == pdTRUE) {
@@ -66,7 +66,7 @@ void app_main(void)
     // Initialize MCP2515 multi library directly with bundle config, see config_hw_mcp2515_multi_receive.h
     (void)canif_multi_init_default(&CAN_HW_CFG);
 
-    rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(can_message_t));
+    rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(twai_message_t));
     if (!rx_queue) {
         ESP_LOGE(TAG, "Failed to create RX queue");
         return;

@@ -42,7 +42,7 @@ static const char *TAG = "receive_interrupt_single";
 
 static QueueHandle_t rx_queue;
 
-static inline void received_to_queue(can_message_t *msg) {
+static inline void received_to_queue(twai_message_t *msg) {
 #if CONFIG_CAN_BACKEND_TWAI
     // TWAI backend: block on driver receive (driver handles IRQ internally)
     if (can_twai_receive(msg)) {
@@ -67,7 +67,7 @@ static inline void received_to_queue(can_message_t *msg) {
 
 static void can_rx_producer_task(void *arg)
 {
-    can_message_t message;
+    twai_message_t message;
     for (;;) {
         received_to_queue(&message);
     }
@@ -76,7 +76,7 @@ static void can_rx_producer_task(void *arg)
 static void can_rx_consumer_task(void *arg)
 {
     (void)arg;
-    can_message_t message;
+    twai_message_t message;
     const bool print_during_receive = false;
 
     for (;;) {
@@ -93,7 +93,7 @@ void app_main(void)
     init_hw();
 
     // --- create RX queue --------------------------------------------------------------------------
-    rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(can_message_t));
+    rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(twai_message_t));
     if (rx_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create RX queue");
         return;

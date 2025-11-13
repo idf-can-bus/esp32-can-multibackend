@@ -1,4 +1,4 @@
-#include "can_message.h"
+#include "driver/twai.h"
 #include "mcp2515_multi_adapter.h"
 #include "esp_log.h"
 
@@ -7,21 +7,28 @@ static const char* TAG = "mcp2515_multi_adapter";
 static MCP2515_Handle *g_handles = NULL;
 static size_t g_count = 0;
 
-static inline void to_frame(const can_message_t *in, CAN_FRAME *out)
+// Convert twai_message_t to CAN_FRAME
+static inline void to_frame(const twai_message_t *in, CAN_FRAME *out)
 {
-    out->can_id = in->extended_id ? (in->id | (1u << 31)) : (in->id & 0x7FF);
-    out->can_dlc = in->dlc;
-    for (int i=0;i<in->dlc;i++) out->data[i] = in->data[i];
+    // Check if extended frame flag is set
+    bool is_extended = (in->flags & TWAI_MSG_FLAG_EXTD) != 0;
+    out->can_id = is_extended ? (in->identifier | (1u << 31)) : (in->identifier & 0x7FF);
+    out->can_dlc = in->data_length_code;
+    for (int i = 0; i < in->data_length_code; i++) {
+        out->data[i] = in->data[i];
+    }
 }
 
-static inline void from_frame(const CAN_FRAME *in, can_message_t *out)
+// Convert CAN_FRAME to twai_message_t
+static inline void from_frame(const CAN_FRAME *in, twai_message_t *out)
 {
-    bool ext = (in->can_id & (1u<<31)) != 0;
-    out->extended_id = ext;
-    out->rtr = false;
-    out->id = ext ? (in->can_id & 0x1FFFFFFF) : (in->can_id & 0x7FF);
-    out->dlc = in->can_dlc;
-    for (int i=0;i<in->can_dlc;i++) out->data[i] = in->data[i];
+    bool ext = (in->can_id & (1u << 31)) != 0;
+    out->flags = ext ? TWAI_MSG_FLAG_EXTD : 0;
+    out->identifier = ext ? (in->can_id & 0x1FFFFFFF) : (in->can_id & 0x7FF);
+    out->data_length_code = in->can_dlc;
+    for (int i = 0; i < in->can_dlc; i++) {
+        out->data[i] = in->data[i];
+    }
 }
 
 bool mcp2515_multi_init(const mcp_multi_instance_cfg_t* instances, size_t count)
@@ -82,20 +89,20 @@ bool mcp2515_multi_deinit(void)
     return true;
 }
 
-bool mcp2515_multi_send(size_t index, const can_message_t* raw_out_msg)
+bool mcp2515_multi_send(size_t index, const twai_message_t* msg)
 {
-    if (!g_handles || index >= g_count || !raw_out_msg) return false;
+    if (!g_handles || index >= g_count || !msg) return false;
     CAN_FRAME f;
-    to_frame(raw_out_msg, &f);
+    to_frame(msg, &f);
     return MCP2515_SendMessageAfterCtrlCheck(g_handles[index], &f) == ERROR_OK;
 }
 
-bool mcp2515_multi_receive(size_t index, can_message_t* raw_in_msg)
+bool mcp2515_multi_receive(size_t index, twai_message_t* msg)
 {
-    if (!g_handles || index >= g_count || !raw_in_msg) return false;
+    if (!g_handles || index >= g_count || !msg) return false;
     CAN_FRAME f;
     ERROR_t rc = MCP2515_ReadMessageAfterStatCheck(g_handles[index], &f);
     if (rc != ERROR_OK) return false;
-    from_frame(&f, raw_in_msg);
+    from_frame(&f, msg);
     return true;
 }

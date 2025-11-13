@@ -31,7 +31,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Multi sender, %zu TX instances", n);
 
-    can_message_t msg;
+    twai_message_t msg;
     uint64_t index = 0;
     const uint64_t stats_every = 2000;
     bool print_during_send = false;

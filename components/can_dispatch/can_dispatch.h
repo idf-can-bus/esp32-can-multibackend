@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
-#include "mcp2515-esp32_multi/can_message.h"
+#include "driver/twai.h"
 
 #include "sdkconfig.h"
 #if CONFIG_CAN_BACKEND_TWAI
@@ -51,10 +51,10 @@ bool canif_init(const can_config_t *cfg);
 bool canif_deinit();
 
 // non-blocking send
-bool canif_send(const can_message_t *raw_out_msg);
+bool canif_send(const twai_message_t *msg);
 
 // non-blocking receive
-bool canif_receive(can_message_t *raw_in_msg);
+bool canif_receive(twai_message_t *msg);
 
 // --- Commomn variable and functions for all backends --------------------------------------------
 // Holder for hardware configuration, can be used to initialize hardware

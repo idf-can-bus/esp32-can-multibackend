@@ -409,9 +409,9 @@ bool mcp2515_single_deinit() {
 }
 
 // Send message
-bool mcp2515_single_send(const can_message_t *raw_out_msg) {
-    if (raw_out_msg->dlc > CAN_MAX_DLEN) {
-        ESP_LOGE(TAG, "Message too long: %d bytes", raw_out_msg->dlc);
+bool mcp2515_single_send(const twai_message_t *msg) {
+    if (msg->data_length_code > CAN_MAX_DLEN) {
+        ESP_LOGE(TAG, "Message too long: %d bytes", msg->data_length_code);
         return false;
     }
 
@@ -421,11 +421,11 @@ bool mcp2515_single_send(const can_message_t *raw_out_msg) {
     uint8_t ctrl2 = MCP2515_readRegister(MCP_TXB2CTRL);
     ESP_LOGD(TAG, "TX buffer status: TXB0=0x%02X, TXB1=0x%02X, TXB2=0x%02X", ctrl0, ctrl1, ctrl2);
  
-
+    // Convert twai_message_t to CAN_FRAME_t
     CAN_FRAME_t frame;  // Array of size 1 containing can_frame structure
-    frame[0].can_id = raw_out_msg->id;
-    frame[0].can_dlc = raw_out_msg->dlc;
-    memcpy(frame[0].data, raw_out_msg->data, raw_out_msg->dlc);
+    frame[0].can_id = msg->identifier;
+    frame[0].can_dlc = msg->data_length_code;
+    memcpy(frame[0].data, msg->data, msg->data_length_code);
     
     ERROR_t ret = MCP2515_sendMessageAfterCtrlCheck(frame);
     
@@ -451,7 +451,7 @@ bool mcp2515_single_send(const can_message_t *raw_out_msg) {
 }
 
 // Receive message
-bool mcp2515_single_receive(can_message_t *raw_in_msg) {
+bool mcp2515_single_receive(twai_message_t *msg) {
     if (!interrupt_pending && !MCP2515_checkReceive()) {
         return false;
     }
@@ -472,6 +472,7 @@ bool mcp2515_single_receive(can_message_t *raw_in_msg) {
         return false;
     }
     
+    // Read CAN frame from MCP2515
     CAN_FRAME_t frame;  // Array of size 1 containing can_frame structure
     ERROR_t ret = MCP2515_readMessageAfterStatCheck(frame);
     if (ret != ERROR_OK) {
@@ -487,9 +488,11 @@ bool mcp2515_single_receive(can_message_t *raw_in_msg) {
         return false;
     }
     
-    raw_in_msg->id = frame[0].can_id;
-    raw_in_msg->dlc = frame[0].can_dlc;
-    memcpy(raw_in_msg->data, frame[0].data, frame[0].can_dlc);
+    // Convert CAN_FRAME_t to twai_message_t
+    msg->identifier = frame[0].can_id;
+    msg->data_length_code = frame[0].can_dlc;
+    msg->flags = 0;  // Standard frame by default
+    memcpy(msg->data, frame[0].data, frame[0].can_dlc);
     
     // Drain any remaining RX frames to prevent RXnOVR under burst logging or delays
     while (MCP2515_checkReceive()) {
