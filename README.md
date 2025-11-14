@@ -1,9 +1,9 @@
-# esp32-can-idf
+# can-multibackend-idf
 
-Unified CAN-bus interface and example suite for ESP32
-====================================================
+Unified CAN-bus interface and example suite for ESP-IDF
+========================================================
 
-This project provides a modular, unified interface for CAN bus communication on ESP32, supporting multiple hardware backends (TWAI, MCP2515 single/multi) and a suite of ready-to-use examples. It is designed for easy switching between different CAN controllers and for rapid prototyping or testing of CAN networks with ESP32.
+This project provides a modular, unified interface for CAN bus communication on ESP-IDF platforms (ESP32, ESP32-S3, ESP32-C3, ESP32-C6), supporting multiple hardware backends (TWAI, MCP2515 single/multi) and a suite of ready-to-use examples. It is designed for easy switching between different CAN controllers and for rapid prototyping or testing of CAN networks.
 
 ## Features
 - Unified API for multiple CAN backends (TWAI, MCP2515 single/multi)
