@@ -1,12 +1,12 @@
 set(MULTI_SRC
   mcp2515_multi_adapter.c
-  esp32-can-mcp2515-multi/src/mcp2515_multi.c
-  esp32-can-mcp2515-multi/src/mcp2515_multi_internal.c
+  mcp25xxx-multi-idf-can/src/mcp2515_multi.c
+  mcp25xxx-multi-idf-can/src/mcp2515_multi_internal.c
 )
 
 idf_component_register(
   SRCS ${MULTI_SRC}
-  INCLUDE_DIRS "." "esp32-can-mcp2515-multi/include" "esp32-can-mcp2515-multi/src"
+  INCLUDE_DIRS "." "mcp25xxx-multi-idf-can/include" "mcp25xxx-multi-idf-can/src"
   REQUIRES driver freertos esp_timer
 )
 

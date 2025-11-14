@@ -316,12 +316,12 @@ Modify this file to match your GPIO connections and CAN bitrate.
 - Mode: Normal
 
 For more examples with advanced features, see:
-- [esp32-can-multibackend](https://github.com/esp32-can/esp32-can-multibackend) - Unified interface supporting multiple CAN backends
+- [can-multibackend-idf](https://github.com/idf-can-bus/can-multibackend-idf) - Unified interface supporting multiple CAN backends
 
 ## Related Projects
 
-- [esp32-can-mcp2515-multi](https://github.com/esp32-can/esp32-can-mcp2515-multi) - External MCP2515 CAN controllers (single or multiple)
-- [esp32-can-multibackend](https://github.com/esp32-can/esp32-can-multibackend) - Unified interface for multiple CAN backends
+- [mcp25xxx-multi-idf-can](https://github.com/idf-can-bus/mcp25xxx-multi-idf-can) - External MCP25xxx CAN controllers (single or multiple)
+- [can-multibackend-idf](https://github.com/idf-can-bus/can-multibackend-idf) - Unified interface for multiple CAN backends
 
 ## License
 
