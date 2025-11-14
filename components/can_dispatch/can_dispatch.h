@@ -27,7 +27,7 @@
 #elif CONFIG_CAN_BACKEND_MCP2515_SINGLE
 // Use unified MCP2515 config types for all MCP2515 variants
 #include "mcp2515_multi.h"
-#include "mcp2515_single_adapter.h"
+#include "can_dispatch_mcp2515_single.h"
 #include "single/config_hw_mcp2515_single.h" // the default configuration for the MCP2515_SINGLE backend
 #elif CONFIG_CAN_BACKEND_MCP2515_MULTI
 // Multi MCP2515 backend interface (bus/dev registry + messaging)

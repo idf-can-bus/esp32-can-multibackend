@@ -24,13 +24,13 @@ if(CONFIG_CAN_BACKEND_TWAI)
 endif()
 
 if(CONFIG_CAN_BACKEND_MCP2515_SINGLE)
-    list(APPEND REQUIRES_DEPS can_backend_mcp2515_single)
+    list(APPEND REQUIRES_DEPS mcp2515-esp32-idf)
     # unified MCP2515 config types are provided by the multi component
-    list(APPEND REQUIRES_DEPS can_backend_mcp2515_multi)
+    list(APPEND REQUIRES_DEPS mcp25xxx-multi-idf-can)
 endif()
 
 if(CONFIG_CAN_BACKEND_MCP2515_MULTI)
-    list(APPEND REQUIRES_DEPS can_backend_mcp2515_multi)
+    list(APPEND REQUIRES_DEPS mcp25xxx-multi-idf-can)
 endif()
 
 idf_component_register(

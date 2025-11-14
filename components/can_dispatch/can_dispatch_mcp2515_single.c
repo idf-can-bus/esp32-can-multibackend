@@ -1,5 +1,5 @@
-#include "mcp2515_single_adapter.h"
-#include "mcp2515-esp32-idf/mcp2515.h"
+#include "can_dispatch_mcp2515_single.h"
+#include "mcp2515.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
