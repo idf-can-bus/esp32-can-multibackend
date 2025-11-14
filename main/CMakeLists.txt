@@ -20,7 +20,7 @@ endif()
 set(REQUIRES_DEPS can_dispatch examples_utils)
 
 if(CONFIG_CAN_BACKEND_TWAI)
-    list(APPEND REQUIRES_DEPS can_backend_twai)
+    list(APPEND REQUIRES_DEPS twai-idf-can)
 endif()
 
 if(CONFIG_CAN_BACKEND_MCP2515_SINGLE)
