@@ -1,9 +1,6 @@
 [submodule "components/mcp2515-esp32-idf"]
 	path = components/mcp2515-esp32-idf
 	url = https://github.com/Microver-Electronics/mcp2515-esp32-idf.git
-[submodule "components/examples_utils"]
-	path = components/examples_utils
-	url = https://github.com/idf-can-bus/examples-utils-idf-can.git
 [submodule "components/mcp25xxx-multi-idf-can"]
 	path = components/mcp25xxx-multi-idf-can
 	url = https://github.com/idf-can-bus/mcp25xxx-multi-idf-can.git

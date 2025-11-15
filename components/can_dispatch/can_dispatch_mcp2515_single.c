@@ -6,19 +6,19 @@
 #include <string.h>
 #include <stdlib.h>
 
-static const char *TAG = "MCP2515_SINGLE_ADAPTER";
+static const char *TAG = "MCP25XXX_SINGLE_ADAPTER";
 // Keep pointer to bundle (provided by example config, typically static const)
 static const mcp2515_bundle_config_t *s_bundle = NULL;
 static volatile bool interrupt_pending = false;
 
-// Compile-time switch for SPI/link diagnostics in MCP2515 adapter
-#ifndef MCP2515_ADAPTER_DEBUG
-#define MCP2515_ADAPTER_DEBUG 0
+// Compile-time switch for SPI/link diagnostics in MCP25xxx adapter
+#ifndef MCP25XXX_ADAPTER_DEBUG
+#define MCP25XXX_ADAPTER_DEBUG 0
 #endif
 
-#if MCP2515_ADAPTER_DEBUG
+#if MCP25XXX_ADAPTER_DEBUG
 static void mcp2515_diagnostics(void) {
-    ESP_LOGI(TAG, "=== MCP2515 Diagnostics ===");
+    ESP_LOGI(TAG, "=== MCP25xxx Diagnostics ===");
     
     // Extended SPI Test - try multiple reads/writes
     ESP_LOGI(TAG, "Testing SPI communication...");
@@ -81,7 +81,7 @@ static void IRAM_ATTR isr_handler(void* arg) {
 }
 
 // (Optional) test CS GPIO manually for diagnostics
-#if MCP2515_ADAPTER_DEBUG
+#if MCP25XXX_ADAPTER_DEBUG
 static void test_gpio_cs(gpio_num_t cs_gpio) {
     gpio_config_t cs_test = {
         .pin_bit_mask = (1ULL << cs_gpio),
@@ -104,9 +104,9 @@ static void test_gpio_cs(gpio_num_t cs_gpio) {
 #endif
 
 
-// Initialize MCP2515
+// Initialize MCP25xxx adapter
 bool mcp2515_single_init(const mcp2515_bundle_config_t *cfg) {
-    ESP_LOGI(TAG, "Initializing MCP2515 adapter");
+    ESP_LOGI(TAG, "Initializing MCP25xxx adapter");
     // Expect at least one device in the bundle
     if (cfg == NULL || cfg->device_count < 1 || cfg->devices == NULL) {
         ESP_LOGE(TAG, "Invalid bundle configuration");
@@ -116,7 +116,7 @@ bool mcp2515_single_init(const mcp2515_bundle_config_t *cfg) {
     s_bundle = cfg;
     const mcp2515_device_config_t *dev0 = &s_bundle->devices[0];
 
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
         // test_gpio_cs(dev0->wiring.cs_gpio);
     #endif
     
@@ -128,7 +128,7 @@ bool mcp2515_single_init(const mcp2515_bundle_config_t *cfg) {
     }
     
     // Step 2: Initialize SPI bus
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
     ESP_LOGI("HARDWARE", "GPIO Configuration:");
     ESP_LOGI("HARDWARE", "  MISO: GPIO_%d", s_bundle->bus.wiring.miso_io_num);
     ESP_LOGI("HARDWARE", "  MOSI: GPIO_%d", s_bundle->bus.wiring.mosi_io_num);
@@ -168,15 +168,17 @@ if (err != ESP_OK) {
     }
     
     // Step 5: Set bitrate
+    // Note: mcp2515.h uses CAN_SPEED_t/CAN_CLOCK_t, but config uses mcp25xxx_speed_t/mcp25xxx_clock_t
+    // Enum values are numerically identical, so cast is safe
     ESP_LOGI(TAG, "Setting bitrate: speed=%d, clock=%d", dev0->can.can_speed, dev0->hw.crystal_frequency);
-    ret = MCP2515_setBitrate(dev0->can.can_speed, dev0->hw.crystal_frequency);
+    ret = MCP2515_setBitrate((CAN_SPEED_t)dev0->can.can_speed, (CAN_CLOCK_t)dev0->hw.crystal_frequency);
     if (ret != ERROR_OK) {
         ESP_LOGE(TAG, "Failed to set bitrate: %d", ret);
         return false;
     }
     ESP_LOGI(TAG, "Bitrate set successfully");
 
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
     // Enable CLKOUT for diagnostics (verifies oscillator is running)
     ESP_LOGI(TAG, "Enabling CLKOUT for diagnostics");
     MCP2515_setClkOut(CLKOUT_DIV1);
@@ -185,28 +187,28 @@ if (err != ESP_OK) {
 
     // Step 6: Switch to normal mode or loopback mode with detailed diagnostics
     CANCTRL_REQOP_MODE_t target_mode;
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
     const char* mode_name;
     #endif
 
     if (dev0->can.use_loopback) {
         target_mode = CANCTRL_REQOP_LOOPBACK;
-        #if MCP2515_ADAPTER_DEBUG
+        #if MCP25XXX_ADAPTER_DEBUG
         mode_name = "loopback";
         #endif
     } else {
         target_mode = CANCTRL_REQOP_NORMAL;
-        #if MCP2515_ADAPTER_DEBUG
+        #if MCP25XXX_ADAPTER_DEBUG
         mode_name = "normal";
         #endif
     }
 
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
     ESP_LOGI(TAG, "Attempting to switch to %s mode (0x%02X)", mode_name, target_mode);
     #endif
 
     // Read current state BEFORE attempting change
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
     uint8_t canstat_before = MCP2515_readRegister(MCP_CANSTAT);
     uint8_t canctrl_before = MCP2515_readRegister(MCP_CANCTRL);
     ESP_LOGI(TAG, "BEFORE: CANSTAT=0x%02X (mode=%d), CANCTRL=0x%02X",
@@ -224,14 +226,14 @@ if (err != ESP_OK) {
         uint8_t current_mode = (canstat >> 5) & 0x07;
         uint8_t requested_mode = (target_mode >> 5) & 0x07;
 
-        #if MCP2515_ADAPTER_DEBUG
+        #if MCP25XXX_ADAPTER_DEBUG
         uint8_t canctrl = MCP2515_readRegister(MCP_CANCTRL);
         ESP_LOGI(TAG, "  Attempt %d: CANSTAT=0x%02X (mode=%d), CANCTRL=0x%02X (want mode=%d)",
                  attempt, canstat, current_mode, canctrl, requested_mode);
         #endif
 
         if (current_mode == requested_mode) {
-            #if MCP2515_ADAPTER_DEBUG
+            #if MCP25XXX_ADAPTER_DEBUG
             ESP_LOGI(TAG, "  SUCCESS! Mode changed to %d", current_mode);
             #endif
             mode_ok = true;
@@ -242,12 +244,12 @@ if (err != ESP_OK) {
     }
 
     if (!mode_ok) {
-        #if MCP2515_ADAPTER_DEBUG
+        #if MCP25XXX_ADAPTER_DEBUG
         ESP_LOGE(TAG, "FAILED to set %s mode after 10 attempts!", mode_name);
         #endif
 
         // Read all relevant registers for debugging
-        #if MCP2515_ADAPTER_DEBUG
+        #if MCP25XXX_ADAPTER_DEBUG
         uint8_t canstat = MCP2515_readRegister(MCP_CANSTAT);
         uint8_t canctrl = MCP2515_readRegister(MCP_CANCTRL);
         uint8_t cnf1 = MCP2515_readRegister(MCP_CNF1);
@@ -263,7 +265,7 @@ if (err != ESP_OK) {
 
         return false;
     }
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
     ESP_LOGI(TAG, "Mode successfully set to %s", mode_name);
     #endif
 
@@ -271,7 +273,7 @@ if (err != ESP_OK) {
     vTaskDelay(pdMS_TO_TICKS(50));
     uint8_t canstat_after = MCP2515_readRegister(MCP_CANSTAT);
     uint8_t final_mode = (canstat_after >> 5) & 0x07;
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
     ESP_LOGI(TAG, "Mode stability check: CANSTAT=0x%02X (mode=%d)", canstat_after, final_mode);
     #endif
     if (final_mode != ((target_mode >> 5) & 0x07)) {
@@ -305,7 +307,7 @@ if (err != ESP_OK) {
     }
 
     // Re-apply requested mode after filter/mask configuration (they force config mode)
-    #if MCP2515_ADAPTER_DEBUG
+    #if MCP25XXX_ADAPTER_DEBUG
     ESP_LOGI(TAG, "Re-applying %s mode after filter/mask configuration", mode_name);
     #endif
     MCP2515_modifyRegister(MCP_CANCTRL, CANCTRL_REQOP, target_mode);
@@ -315,7 +317,7 @@ if (err != ESP_OK) {
         uint8_t canstat = MCP2515_readRegister(MCP_CANSTAT);
         uint8_t current_mode = (canstat >> 5) & 0x07;
         uint8_t requested_mode = (target_mode >> 5) & 0x07;
-        #if MCP2515_ADAPTER_DEBUG
+        #if MCP25XXX_ADAPTER_DEBUG
         ESP_LOGI(TAG, "  Re-apply attempt %d: CANSTAT=0x%02X (mode=%d), want mode=%d",
                  attempt, canstat, current_mode, requested_mode);
         #endif
@@ -326,7 +328,7 @@ if (err != ESP_OK) {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
     if (!mode2_ok) {
-        #if MCP2515_ADAPTER_DEBUG
+        #if MCP25XXX_ADAPTER_DEBUG
         ESP_LOGE(TAG, "Failed to re-apply %s mode after filter/mask configuration", mode_name);
         #endif
         return false;
@@ -361,16 +363,16 @@ if (err != ESP_OK) {
         return false;
     }
     
-    ESP_LOGI(TAG, "MCP2515 adapter initialized successfully");
-    #if MCP2515_ADAPTER_DEBUG
+    ESP_LOGI(TAG, "MCP25xxx adapter initialized successfully");
+    #if MCP25XXX_ADAPTER_DEBUG
     mcp2515_diagnostics();
     #endif
     return true;
 }
 
-// Deinitialize MCP2515
+// Deinitialize MCP25xxx adapter
 bool mcp2515_single_deinit() {
-    ESP_LOGI(TAG, "Deinitializing MCP2515 adapter");
+    ESP_LOGI(TAG, "Deinitializing MCP25xxx adapter");
     
     // Step 1: Switch to config mode
     ERROR_t ret = MCP2515_setConfigMode();
@@ -404,7 +406,7 @@ bool mcp2515_single_deinit() {
         return false;
     }
     
-    ESP_LOGI(TAG, "MCP2515 adapter deinitialized successfully");
+    ESP_LOGI(TAG, "MCP25xxx adapter deinitialized successfully");
     return true;
 }
 
@@ -459,7 +461,7 @@ bool mcp2515_single_receive(twai_message_t *msg) {
     // Check for errors
     if (MCP2515_checkError()) {
         uint8_t eflg = MCP2515_getErrorFlags();
-        ESP_LOGE(TAG, "MCP2515 error flags: 0x%02x", eflg);
+        ESP_LOGE(TAG, "MCP25xxx error flags: 0x%02x", eflg);
         // Handle RX buffer overrun explicitly: clear EFLG RXnOVR and related interrupts
         if (eflg & (EFLG_RX0OVR | EFLG_RX1OVR)) {
             MCP2515_clearRXnOVR();
@@ -472,7 +474,7 @@ bool mcp2515_single_receive(twai_message_t *msg) {
         return false;
     }
     
-    // Read CAN frame from MCP2515
+    // Read CAN frame from MCP25xxx
     CAN_FRAME_t frame;  // Array of size 1 containing can_frame structure
     ERROR_t ret = MCP2515_readMessageAfterStatCheck(frame);
     if (ret != ERROR_OK) {

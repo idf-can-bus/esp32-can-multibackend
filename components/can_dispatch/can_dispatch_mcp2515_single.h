@@ -2,17 +2,17 @@
 #include "driver/twai.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
-#include "mcp2515_multi.h"
+#include "mcp25xxx_multi.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-// Initialize MCP2515
+// Initialize MCP25xxx adapter
 bool mcp2515_single_init(const mcp2515_bundle_config_t *cfg);
 
-// Deinitialize MCP2515
+// Deinitialize MCP25xxx adapter
 bool mcp2515_single_deinit();
 
 // Send message

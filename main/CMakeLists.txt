@@ -1,23 +1,48 @@
-set(EXAMPLES_DIR ${CMAKE_SOURCE_DIR}/examples)
+# Select example source based on Kconfig
+# Examples are compiled from their component directories using can_dispatch for backend abstraction
 
-
-# By Kconfig select the example to build
 if(CONFIG_EXAMPLE_SEND_SINGLE)
-    list(APPEND APP_SRC "${EXAMPLES_DIR}/single/send_single.c")
+    # Use TWAI example with can_dispatch providing backend abstraction
+    set(APP_SRC "${CMAKE_SOURCE_DIR}/components/twai-idf-can/examples/send/main/main.c")
+    set(EXTRA_INCLUDE_DIRS 
+        "${CMAKE_SOURCE_DIR}/components/twai-idf-can/examples"
+        "${CMAKE_SOURCE_DIR}/components/twai-idf-can/include"
+    )
 elseif(CONFIG_EXAMPLE_RECV_POLL_SINGLE)
-    list(APPEND APP_SRC "${EXAMPLES_DIR}/single/receive_poll_single.c")
+    set(APP_SRC "${CMAKE_SOURCE_DIR}/components/twai-idf-can/examples/receive_poll/main/main.c")
+    set(EXTRA_INCLUDE_DIRS 
+        "${CMAKE_SOURCE_DIR}/components/twai-idf-can/examples"
+        "${CMAKE_SOURCE_DIR}/components/twai-idf-can/include"
+    )
 elseif(CONFIG_EXAMPLE_RECV_INT_SINGLE)
-    list(APPEND APP_SRC "${EXAMPLES_DIR}/single/receive_interrupt_single.c")
+    set(APP_SRC "${CMAKE_SOURCE_DIR}/components/twai-idf-can/examples/receive_interrupt/main/main.c")
+    set(EXTRA_INCLUDE_DIRS 
+        "${CMAKE_SOURCE_DIR}/components/twai-idf-can/examples"
+        "${CMAKE_SOURCE_DIR}/components/twai-idf-can/include"
+    )
 elseif(CONFIG_EXAMPLE_SEND_MULTI)
-    list(APPEND APP_SRC "${EXAMPLES_DIR}/multi/send_multi.c")
+    set(APP_SRC "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/examples/send/main/main.c")
+    set(EXTRA_INCLUDE_DIRS 
+        "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/examples"
+        "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/include"
+    )
 elseif(CONFIG_EXAMPLE_RECV_POLL_MULTI)
-    list(APPEND APP_SRC "${EXAMPLES_DIR}/multi/receive_poll_multi.c")
+    set(APP_SRC "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/examples/receive_poll/main/main.c")
+    set(EXTRA_INCLUDE_DIRS 
+        "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/examples"
+        "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/include"
+    )
 elseif(CONFIG_EXAMPLE_RECV_INT_MULTI)
-    list(APPEND APP_SRC "${EXAMPLES_DIR}/multi/receive_interrupt_multi.c")
+    set(APP_SRC "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/examples/receive_interrupt/main/main.c")
+    set(EXTRA_INCLUDE_DIRS 
+        "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/examples"
+        "${CMAKE_SOURCE_DIR}/components/mcp25xxx-multi-idf-can/include"
+    )
 endif()
 
 # Build required component list conditionally by selected backend
-set(REQUIRES_DEPS can_dispatch examples_utils)
+# Note: examples_utils is provided by example submodules (twai-idf-can, mcp25xxx-multi-idf-can)
+set(REQUIRES_DEPS can_dispatch)
 
 if(CONFIG_CAN_BACKEND_TWAI)
     list(APPEND REQUIRES_DEPS twai-idf-can)
@@ -35,6 +60,6 @@ endif()
 
 idf_component_register(
     SRCS ${APP_SRC}
-    INCLUDE_DIRS "." "${EXAMPLES_DIR}"
+    INCLUDE_DIRS "." ${EXTRA_INCLUDE_DIRS}
     REQUIRES ${REQUIRES_DEPS}
 )

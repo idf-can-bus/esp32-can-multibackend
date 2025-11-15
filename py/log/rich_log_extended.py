@@ -11,6 +11,7 @@ from textual.widgets import RichLog
 import time
 import asyncio
 from typing import Any, Optional
+from rich.markup import escape
 
 
 class RichLogExtended(RichLog):
@@ -119,6 +120,7 @@ class RichLogExtended(RichLog):
         """
         Flush all buffered writes to parent RichLog.
         Updates statistics and respects max_lines limit.
+        Handles MarkupError by escaping problematic characters.
         """
         if not self.buffer:
             return
@@ -129,7 +131,25 @@ class RichLogExtended(RichLog):
         flush_start = time.time()
         
         for write_params in self.buffer:
-            super().write(**write_params)
+            try:
+                super().write(**write_params)
+            except Exception as e:
+                # If markup parsing fails, escape the content and try again
+                if 'MarkupError' in str(type(e).__name__):
+                    content = write_params.get('content', '')
+                    if isinstance(content, str):
+                        # Escape markup characters and retry
+                        write_params['content'] = escape(str(content))
+                        try:
+                            super().write(**write_params)
+                        except Exception:
+                            # If still failing, write without any formatting
+                            write_params['content'] = str(content).replace('[', '(').replace(']', ')')
+                            super().write(**write_params)
+                else:
+                    # Re-raise non-markup errors
+                    raise
+            
             self.total_lines += 1
             
             if self.max_lines and self.total_lines > self.max_lines:
