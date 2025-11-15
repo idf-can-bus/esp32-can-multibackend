@@ -4,3 +4,6 @@
 [submodule "components/mcp25xxx-multi-idf-can"]
 	path = components/mcp25xxx-multi-idf-can
 	url = https://github.com/idf-can-bus/mcp25xxx-multi-idf-can.git
+[submodule "components/twai-idf-can"]
+	path = components/twai-idf-can
+	url = https://github.com/idf-can-bus/twai-idf-can.git
