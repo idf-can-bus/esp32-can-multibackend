@@ -138,7 +138,9 @@ bool mcp2515_single_init(const mcp2515_bundle_config_t *cfg) {
     #endif
 
     // Map bus config and initialize
-    spi_bus_config_t idf_bus_cfg;
+    // Always zero-initialize bus config to avoid undefined fields that could
+    // confuse the SPI driver (e.g. invalid core/interrupt parameters).
+    spi_bus_config_t idf_bus_cfg = {};
     spi_host_device_t host;
     int dma_chan;
     if (!mcp_spi_bus_to_idf(&s_bundle->bus, &host, &idf_bus_cfg, &dma_chan)) {

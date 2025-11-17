@@ -1,10 +1,10 @@
 /**
  * @file can_dispatch.c
  * @brief CAN backend dispatcher implementation
- * 
+ *
  * Provides unified can_twai_* API implementation for non-TWAI backends.
  * Maps TWAI-style calls to backend-specific functions.
- * 
+ *
  * @author Ivo Marvan
  * @date 2025
  */
@@ -14,6 +14,19 @@
 
 #if CONFIG_CAN_BACKEND_MCP2515_MULTI
 #include "mcp25xxx_multi.h"
+#endif
+
+// ======================================================================================
+// Backend identification overrides for dispatched single-device backends
+// ======================================================================================
+
+#if CONFIG_CAN_BACKEND_MCP2515_SINGLE
+const char *can_backend_get_name(void)
+{
+    // For MCP2515 single backend, override the default multi-backend name
+    // to clearly identify the 3rd-party single-controller driver.
+    return "MCP2515 single";
+}
 #endif
 
 // ======================================================================================
@@ -31,7 +44,13 @@
 
 bool can_twai_init(const twai_backend_config_t *cfg)
 {
-    // MCP25xxx single expects mcp2515_bundle_config_t
+    // NOTE:
+    //  - For TWAI examples, cfg is obtained from TWAI_HW_CFG.
+    //  - In the multi-backend project, TWAI_HW_CFG is an alias that actually
+    //    refers to MCP_SINGLE_HW_CFG (type mcp2515_bundle_config_t) defined
+    //    in examples/can_single_MCP25xxx_config.h.
+    //  - We therefore safely reinterpret the pointer here and pass it to the
+    //    MCP2515 single adapter.
     return mcp2515_single_init((const mcp2515_bundle_config_t *)cfg);
 }
 
@@ -62,7 +81,9 @@ void can_twai_reset_if_needed(void)
 
 bool can_twai_init(const twai_backend_config_t *cfg)
 {
-    // Multi backend expects mcp2515_bundle_config_t
+    // Multi backend expects mcp2515_bundle_config_t; in the single-example
+    // path, cfg is a twai_backend_config_t-compatible alias pointing to a
+    // mcp2515_bundle_config_t instance (see examples/config_twai.h).
     return canif_multi_init_default((const mcp2515_bundle_config_t *)cfg);
 }
 

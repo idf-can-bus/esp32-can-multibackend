@@ -10,7 +10,7 @@
  * - Single examples use can_twai_* API (this file provides declarations)
  * - Multi examples use canif_* API from mcp25xxx_multi.h directly
  * - Backend selection via Kconfig (CONFIG_CAN_BACKEND_*)
- * - Examples include their own headers (can_twai.h, config_twai.h, etc.)
+ * - Examples include their own headers (can_twai.h, config_can.h, etc.)
  * 
  * For TWAI backend: Examples include can_twai.h directly (native implementation)
  * For other backends: This file provides can_twai_* wrapper declarations
@@ -86,6 +86,22 @@ bool can_twai_receive(twai_message_t *msg);
 void can_twai_reset_if_needed(void);
 
 #endif // !CONFIG_CAN_BACKEND_TWAI
+
+// ======================================================================================
+// Type casting note for MCP backends
+// ======================================================================================
+/**
+ * @brief Configuration compatibility for MCP backends
+ * 
+ * For TWAI backend: config_can.h from twai-idf-can/examples/ provides TWAI_HW_CFG
+ * For MCP backends: examples/config_can.h wrapper provides TWAI_HW_CFG macro
+ *                   that casts MCP_SINGLE_HW_CFG to twai_backend_config_t*
+ * 
+ * The actual configuration must be included in example code, not here in can_dispatch.h,
+ * because this is a component header and cannot access examples/ directory.
+ * 
+ * Type conversion happens in can_dispatch.c implementation during init calls.
+ */
 
 #ifdef __cplusplus
 }

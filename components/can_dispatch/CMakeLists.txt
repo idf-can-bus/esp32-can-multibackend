@@ -1,10 +1,18 @@
 set(SRCS "can_dispatch.c")
 set(INCLUDE_DIRS ".")
 
-# Always require these for type definitions used in headers:
-# - twai-idf-can: twai_backend_config_t, twai_message_t (for all single examples)
-# - mcp25xxx-multi-idf-can: mcp2515_bundle_config_t (used in can_dispatch_mcp2515_single.h)
-set(REQUIRES_DEPS twai-idf-can mcp25xxx-multi-idf-can)
+# Local include dirs:
+# - this component directory (public API)
+# - twai-idf-can/include for can_twai_config.h and related types
+set(INCLUDE_DIRS "."
+    "${CMAKE_CURRENT_SOURCE_DIR}/../twai-idf-can/include"
+)
+
+# Always require mcp25xxx-multi-idf-can for shared types (mcp2515_bundle_config_t).
+# TWAI implementation (twai-idf-can) is pulled in by the top-level application
+# only when TWAI backend is selected, so we do not list it here to avoid
+# linking TWAI code for MCP-only backends.
+set(REQUIRES_DEPS mcp25xxx-multi-idf-can)
 
 # Add MCP25xxx single adapter if enabled
 if(CONFIG_CAN_BACKEND_MCP2515_SINGLE)

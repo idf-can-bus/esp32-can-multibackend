@@ -20,7 +20,7 @@ Examples using ESP32's built-in TWAI (CAN) controller:
 
 **API:** Direct `can_twai_*` functions  
 **Hardware:** ESP32/S3/C3/C6 with CAN transceiver (e.g., SN65HVD230)  
-**Configuration:** [`config_twai.h`](../components/twai-idf-can/examples/config_twai.h)
+**Configuration:** [`config_can.h`](../components/twai-idf-can/examples/config_can.h)
 
 ---
 
